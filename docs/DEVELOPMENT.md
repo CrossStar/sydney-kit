@@ -33,7 +33,7 @@
 
 ## 当前工作区与安装位置
 
-本机源码工作区是 F:/Workspace/sydney-kit；Pi 加载副本仍在 ~/.pi/agent/extensions/sydney-kit。两个目录分开维护，源码修改经过测试后再同步到加载副本，并执行 /reload。新工作区初始的 node_modules 是指向现有安装依赖目录的本地 junction；不随 Git 或 ZIP 分发。在另一台机器上使用 npm ci 安装依赖。
+本机源码工作区是 F:/Workspace/B__Projects/sydney-kit；Pi 加载副本仍在 ~/.pi/agent/extensions/sydney-kit。两个目录分开维护，源码修改经过测试后再同步到加载副本，并执行 /reload。新工作区初始的 node_modules 是指向现有安装依赖目录的本地 junction；不随 Git 或 ZIP 分发。在另一台机器上使用 npm ci 安装依赖。
 
 整理前的源码已建立 Git 基线，并在工作区外备份。目录迁移后，旧根目录功能文件不应继续保留，避免出现两套实现。部署时保留安装目录的 node_modules，并复制根入口、配置和运行所需目录；删除前应先确认对应文件在备份中。
 

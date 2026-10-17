@@ -22,9 +22,41 @@
 
 ## 下载与安装
 
-### 获取源码包
+### 使用 Pi 安装（推荐）
 
-当前以 **`sydney-kit.zip` 源码压缩包**提供，尚未配置公开下载地址或发布到 npm。请从维护者提供的附件获取源码包；不要使用 `npm install sydney-kit` 作为本插件的安装命令。
+```powershell
+pi install git:github.com/CrossStar/sydney-kit
+```
+
+也可以使用完整仓库地址：
+
+```powershell
+pi install https://github.com/CrossStar/sydney-kit.git
+```
+
+Pi 会克隆仓库、安装运行依赖并登记扩展入口，不需要手动复制文件或运行 `npm ci`。安装后在 Pi 中执行 `/reload`，或重新启动 Pi。若首次应用了宿主补丁，需要完整重启才能生效。
+
+如果此前已经手动安装过本插件，请先通过 `pi config` 停用旧副本，避免同一功能被注册两次。宿主补丁的版本和安装路径要求见下文。
+
+更新插件：
+
+```powershell
+pi update git:github.com/CrossStar/sydney-kit
+```
+
+仅运行 `pi update` 会更新 Pi 本身。修改过插件配置时，更新前请保存自己的设置。
+
+### 手动下载与安装
+
+从 [GitHub Releases](https://github.com/CrossStar/sydney-kit/releases/latest) 下载 `sydney-kit-0.1.0.zip`，或在 [仓库页面](https://github.com/CrossStar/sydney-kit) 选择 **Code → Download ZIP** 获取源码。
+
+也可以克隆仓库：
+
+```powershell
+git clone https://github.com/CrossStar/sydney-kit.git
+```
+
+本插件尚未发布到 npm，不要使用 `npm install sydney-kit` 作为安装命令。GitHub 自动生成的源码包可能解压为 `sydney-kit-main/`，安装前请将目录重命名为 `sydney-kit/`。
 
 安装包包含一个 `sydney-kit/` 文件夹。将它解压到 Pi 的用户扩展目录：
 
@@ -44,9 +76,9 @@
 
 Windows 对应目录为 `%USERPROFILE%\.pi\agent\extensions\sydney-kit\`。确认 `index.ts` 位于这一层，避免解压成两层同名目录。
 
-### 安装依赖
+### 手动安装依赖
 
-准备好可用的 Node.js 和 npm，然后在 PowerShell 中运行：
+使用上面的 `pi install` 时跳过本步骤。手动安装需要准备好可用的 Node.js 和 npm，然后在 PowerShell 中运行：
 
 ```powershell
 cd "$env:USERPROFILE\.pi\agent\extensions\sydney-kit"
@@ -57,7 +89,7 @@ npm ci
 
 ### 设置补丁安装路径
 
-**首次加载前**，打开 `config.ts`，将以下两项的 `packageRoot` 改为本机 Pi 的实际安装位置：
+**首次加载前确认路径**。若不是默认的 Bun 全局安装，可设置环境变量 `SYDNEY_KIT_PI_ROOT`，或在插件的 `config.ts` 中修改以下两项：
 
 - `codeblockPatch.packageRoot`
 - `ternImagePatch.packageRoot`
@@ -82,7 +114,7 @@ features.ternImagePatch = false;
 /reload
 ```
 
-Pi 会自动发现扩展目录中的 `index.ts`。首次安装若自动应用了代码块或 Tern 补丁，**需要完整退出并重启 Pi**，才能加载修改后的宿主代码。代码块补丁成功处理时保持静默。
+Git 安装通过 `package.json` 中声明的 `index.ts` 加载；手动安装则由扩展目录发现入口。首次安装若自动应用了代码块或 Tern 补丁，**需要完整退出并重启 Pi**，才能加载修改后的宿主代码。代码块补丁成功处理时保持静默。
 
 ## 日常使用
 

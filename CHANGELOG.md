@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased
+## 0.1.0
+
+- 首次发布到 CrossStar/sydney-kit，支持通过 Pi 的 Git 包安装命令加载。
 
 - 功能代码按 UI、工具输出、渲染、剪贴板、宿主维护归类到 src。
 - 独立测试迁入 tests，集中宿主 SDK 与项目路径解析。

@@ -1,6 +1,10 @@
 {
   "name": "sydney-kit",
   "version": "0.1.0",
+  "description": "Compact tools, code highlighting, diffs and image paste for Pi Coding Agent",
+  "repository": { "type": "git", "url": "https://github.com/CrossStar/sydney-kit.git" },
+  "homepage": "https://github.com/CrossStar/sydney-kit#readme",
+  "bugs": { "url": "https://github.com/CrossStar/sydney-kit/issues" },
   "private": true,
   "type": "module",
   "scripts": {
