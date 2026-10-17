@@ -1,0 +1,32 @@
+import {projectRoot,hostRoot,hostPath,hostImport} from './helpers/paths.mjs';
+import assert from 'node:assert/strict';
+const {createJiti}=await hostImport('pi-coding-agent/dist/core/extensions/jiti-loader.js');
+const {UserMessageComponent}=await hostImport('pi-coding-agent/dist/modes/interactive/components/user-message.js');
+const {loadThemeFromPath,setThemeInstance,getMarkdownTheme}=await hostImport('pi-coding-agent/dist/modes/interactive/theme/theme.js');
+const {visibleWidth}=await hostImport('pi-tui/dist/index.js');
+const jiti=createJiti(import.meta.url,{alias:{'@earendil-works/pi-tui':hostPath('pi-tui/dist/index.js')}});
+const {default:install}=await jiti.import(projectRoot+'/src/ui/user-message.ts');
+let transform;const hooks={};install({registerMarkdownTransformer:f=>transform=f,on:(name,f)=>hooks[name]=f});
+setThemeInstance(loadThemeFromPath(projectRoot+'/tests/fixtures/tokyo-night.json'));
+for(const text of ['FormulaScratchPad.ahk 隐藏托盘图标','第一行\n第二行','中文长消息'.repeat(50)])for(const width of [20,80,120]){
+ const lines=new UserMessageComponent(text,getMarkdownTheme(),1,[transform]).render(width);
+ assert.ok(lines.every(l=>visibleWidth(l)<=width));
+ const plain=lines.map(l=>l.replace(/\x1b\[[0-?]*[ -/]*[@-~]/g,'').replace(/\x1b\][^\x07]*\x07/g,''));
+ assert.equal(plain[0].trim(),'');
+ assert.ok(plain[1].includes('▔'));
+ const transformed=transform(text,{messageType:'user',availableWidth:width-2});
+ assert.ok(transformed.includes('  \n'+text+'  \n'));
+ assert.ok(plain[2].trim(),'message starts immediately below top rule');
+ const bottomIndex=plain.findLastIndex(l=>/^▁+$/.test(l.trim()));
+ assert.ok(plain[bottomIndex-1].trim(),'bottom rule directly follows message');
+ assert.ok(!transformed.includes('❯'));
+ assert.match(plain.filter(l=>l.trim()).at(-1).trim(),/^▁+$/);
+ console.log(width,plain.slice(0,3).join('\n'));
+}
+const mock={ui:{theme:{fg:(_c,s)=>s}}};
+hooks.session_start({},mock);
+const transformed=transform('message test',{messageType:'user',availableWidth:80});
+assert.equal(transformed,'▔'.repeat(80)+'  \nmessage test  \n'+'▁'.repeat(80));
+assert.ok(!transformed.includes('时间未知'));
+assert.equal(transform('assistant unchanged',{messageType:'assistant',availableWidth:80}),'assistant unchanged');
+console.log('PASS: full-width rules without time, unchanged message text, no injected prefix or wrapping, width bounds.');

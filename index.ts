@@ -1,14 +1,14 @@
 import type { ExtensionAPI } from '@earendil-works/pi-coding-agent';
 import { features } from './config';
-import footer from './footer';
-import appearance from './appearance';
-import userMessage from './user-message';
-import codeblockPatch from './codeblock-patch';
-import codeblock from './codeblock';
-import diff from './diff';
-import pasteImage from './paste-image';
-import ternImagePatch from './tern-image-patch';
-import compact from './compact';
+import footer from './src/ui/footer';
+import appearance from './src/ui/appearance';
+import userMessage from './src/ui/user-message';
+import codeblockPatch from './src/host/codeblock-patch';
+import codeblock from './src/rendering/codeblock';
+import diff from './src/rendering/diff';
+import pasteImage from './src/clipboard/paste-image';
+import ternImagePatch from './src/host/tern-image-patch';
+import compact from './src/tools/compact';
 export default function(pi: ExtensionAPI) {
   if (features.footer) footer(pi);
   if (features.compact) compact(pi);

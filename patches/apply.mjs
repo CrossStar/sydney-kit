@@ -1,9 +1,10 @@
+import { resolveHostRoot } from '../src/host/paths.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 const command=process.argv[2]??'status';
 const i=process.argv.indexOf('--root');
-const root=i>=0?path.resolve(process.argv[i+1]):'C:/Users/Sydney/.bun/install/global/node_modules/@earendil-works';
+const root=resolveHostRoot(i>=0?process.argv[i+1]:undefined);
 const target=path.join(root,'pi-tui/dist/components/markdown.js');
 const backup=target+'.sydney-kit-1.3.0.bak';
 const originalHash='43185f806cc13c2adbe7f30b30be35bba4fce7a5ead4da81f53fe62b9bbbdc3d';

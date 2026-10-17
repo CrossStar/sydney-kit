@@ -3,6 +3,11 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "scripts": {
+    "test": "node scripts/test.mjs",
+    "package": "node scripts/package.mjs",
+    "patch:status": "node patches/apply.mjs status && node patches/tern-images.mjs status"
+  },
   "pi": {
     "extensions": [
       "./index.ts"

@@ -34,8 +34,11 @@
 ├── config.ts
 ├── package.json
 ├── package-lock.json
+├── src/                       # 功能代码
 ├── patches/
 ├── scripts/
+├── docs/
+├── tests/
 └── vendor/
 ```
 
@@ -59,7 +62,7 @@ npm ci
 - `codeblockPatch.packageRoot`
 - `ternImagePatch.packageRoot`
 
-这个目录应同时包含 `pi-coding-agent/` 和 `pi-tui/`，通常是安装目录中的 `node_modules/@earendil-works/`。源码当前保留维护者机器的路径，需要自行调整。
+这个目录应同时包含 `pi-coding-agent/` 和 `pi-tui/`，通常是安装目录中的 `node_modules/@earendil-works/`。默认使用当前用户的 Bun 全局安装目录，也可以通过环境变量 `SYDNEY_KIT_PI_ROOT` 指定；其他安装方式需确认路径。
 
 如果暂时不使用宿主补丁，可以先设置：
 
@@ -146,12 +149,24 @@ node patches/tern-images.mjs status --root "D:/path/to/node_modules/@earendil-wo
 
 更新 Sydney Kit 前，建议保留自己的 `config.ts` 设置。替换源码、安装依赖后再对照新配置合并设置，避免直接覆盖掉新增选项。
 
+## 项目开发
+
+源码按职责放在 `src/ui`、`src/tools`、`src/rendering`、`src/clipboard` 和 `src/host`。根目录的 `index.ts` 只负责注册，`config.ts` 保留为统一配置入口。
+
+```powershell
+npm test
+npm run package
+npm run patch:status
+```
+
+`npm test` 运行独立验证脚本，不启动 Pi 或模型会话；当前完整套件包含 Windows 和已应用宿主钩子的集成测试。`npm run package` 在 `dist/` 生成源码 ZIP 和文件哈希清单，不包含 `node_modules`。开发环境、安装同步及回退见 [开发指南](docs/DEVELOPMENT.md)。
+
 ## 更多说明
 
-- [代码高亮、diff 与代码块钩子](HIGHLIGHT.md)
-- [图片粘贴与附件行为](PASTE-IMAGE.md)
-- [Tern 图片兼容补丁](TERN-IMAGE-PATCH.md)
-- [渲染性能与缓存](INTERACTION-PERFORMANCE.md)
-- [界面模块与迁移说明](MIGRATION.md)
+- [代码高亮、diff 与代码块钩子](docs/HIGHLIGHT.md)
+- [图片粘贴与附件行为](docs/PASTE-IMAGE.md)
+- [Tern 图片兼容补丁](docs/TERN-IMAGE-PATCH.md)
+- [渲染性能与缓存](docs/INTERACTION-PERFORMANCE.md)
+- [界面模块与迁移说明](docs/archive/MIGRATION.md)
 
 使用其他会替换输入框、工具渲染器或状态栏的扩展时，可能需要关闭重叠功能。终端图片是否正常显示，还取决于终端支持的图片协议和 Pi 的对应设置。

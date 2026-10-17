@@ -1,7 +1,8 @@
 // Version-pinned Tern compatibility patch; sydney-kit can maintain it on TUI startup.
+import { resolveHostRoot } from '../src/host/paths.mjs';
 import fs from 'node:fs';import path from 'node:path';import crypto from 'node:crypto';
 const command=process.argv[2]??'status',arg=process.argv.indexOf('--root');
-const root=arg<0?'C:/Users/Sydney/.bun/install/global/node_modules/@earendil-works':path.resolve(process.argv[arg+1]);
+const root=resolveHostRoot(arg<0?undefined:process.argv[arg+1]);
 const target=path.join(root,'pi-tui/dist/tui-alt-screen.js'),backup=target+'.sydney-tern-images-1.3.0.bak';
 const expected='aa0b953c0158357d20a1d6f868cd4d7b667fd6646848a788ffded9808c9ef720';
 const hash=s=>crypto.createHash('sha256').update(s).digest('hex');
