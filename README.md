@@ -123,7 +123,7 @@ export const features = {
 | `pasteImage.maxEdge` | `2000` | 图片最长边像素数。 |
 | `highlighting.theme` | `github-dark-dimmed` | Shiki 代码高亮主题。 |
 
-输入框、分隔线和正文颜色还会受到当前 Pi 主题影响。本插件不自动切换主题；维护者使用的自定义 `tokyo-night` 主题不包含在源码包中。
+输入框、分隔线和正文颜色还会受到当前 Pi 主题影响。本插件不自动切换或安装主题；`tests/fixtures/tokyo-night.json` 仅作为固定测试样本使用。
 
 ## 补丁、更新与停用
 
