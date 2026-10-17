@@ -27,7 +27,7 @@ try{
  process.env.TERM_PROGRAM='tern';let release;const delayed=new Promise(resolve=>release=resolve),late={};
  register({on:(n,f)=>late[n]=f},()=>delayed);late.session_start({},ctx);const pending=globalThis[op];late.session_shutdown();release(JSON.stringify({status:'applied'}));await pending;await Promise.resolve();assert.equal(notices.length,0);
  const {features}=await jiti.import(root+'/config.ts');const {default:entry}=await jiti.import(root+'/index.ts');for(const key of Object.keys(features))features[key]=false;
- let events=0;entry({on(){events++}});assert.equal(events,0);features.ternImagePatch=true;entry({on(){events++}});assert.equal(events,2);
+ let events=0;entry({on(){events++}});const baseEvents=events;events=0;features.ternImagePatch=true;entry({on(){events++}});assert.equal(events,baseEvents+2);
  console.log('PASS automatic apply, idempotent startup, supported update overwrite -> reapply, unsupported version/unknown file refused, Tern/TUI gating, restart notice, shutdown and feature flag. Real host untouched.');
 }finally{await fs.rm(temp,{recursive:true,force:true});if(oldTerm===undefined)delete process.env.TERM_PROGRAM;else process.env.TERM_PROGRAM=oldTerm;delete globalThis[op];delete globalThis[restart];}
 process.exit(0);

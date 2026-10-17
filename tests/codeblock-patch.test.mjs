@@ -31,7 +31,7 @@ try{
  const sharedRun=()=>{sharedCalls++;return delayed};register({on:(n,f)=>first[n]=f},sharedRun);register({on:(n,f)=>second[n]=f},sharedRun);
  first.session_start({},ctx);first.session_shutdown();second.session_start({},ctx);assert.equal(sharedCalls,1);release(JSON.stringify({status:'applied'}));await drain();assert.equal(notices.length,0);
  const {features}=await jiti.import(root+'/config.ts'),{default:entry}=await jiti.import(root+'/index.ts');for(const key of Object.keys(features))features[key]=false;
- let events=0;features.codeblockPatch=true;entry({on(){events++}});assert.equal(events,0);features.codeblock=true;entry({on(){events++}});assert.equal(events,4);
+ let events=0;entry({on(){events++}});const baseEvents=events;events=0;features.codeblockPatch=true;entry({on(){events++}});assert.equal(events,baseEvents);events=0;features.codeblock=true;entry({on(){events++}});assert.equal(events,baseEvents+4);
  const {default:codeblock}=await jiti.import(root+'/src/rendering/codeblock.ts');const cb={};delete globalThis.__sydneyKitMarkdownHookVersion;notices.length=0;codeblock({on:(n,f)=>cb[n]=f});cb.session_start({},ctx);assert.equal(notices.length,0);features.codeblockPatch=false;cb.session_start({},ctx);assert.equal(notices.length,1);
  console.log('PASS codeblock auto apply, idempotence, overwrite recovery, version/hash rejection, silent successful startup/reload, shared reload operation, shutdown, failure warning, feature gating and duplicate warning suppression. Real host untouched.');
 }finally{await fs.rm(temp,{recursive:true,force:true});delete globalThis[key];}

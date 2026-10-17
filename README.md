@@ -20,6 +20,8 @@
 
 插件只为已有网页、后台任务和 Fusion 工具优化显示，不负责安装这些工具。
 
+聊天历史中的上下文压缩卡片采用单行摘要，展开后显示精确压缩前 token 数和可读摘要；不显示加密元数据。Pi 1.3.0 宿主补丁需完整重启生效，详见 [压缩卡片说明](docs/COMPACTION-CARD.md)。
+
 ## 下载与安装
 
 ### 使用 Pi 安装（推荐）
@@ -70,6 +72,7 @@ git clone https://github.com/CrossStar/sydney-kit.git
 ├── patches/
 ├── scripts/
 ├── docs/
+├── themes/                    # Tokyo Night 主题
 ├── tests/
 └── vendor/
 ```
@@ -155,7 +158,9 @@ export const features = {
 | `pasteImage.maxEdge` | `2000` | 图片最长边像素数。 |
 | `highlighting.theme` | `github-dark-dimmed` | Shiki 代码高亮主题。 |
 
-输入框、分隔线和正文颜色还会受到当前 Pi 主题影响。本插件不自动切换或安装主题；`tests/fixtures/tokyo-night.json` 仅作为固定测试样本使用。
+输入框、分隔线和正文颜色还会受到当前 Pi 主题影响。本插件附带 `themes/tokyo-night.json`，保留现有测试样本中的配色。使用 `pi install` 安装后，启动或执行 `/reload` 时会默认应用 `tokyo-night`。可在 `/settings` → **Theme** 中临时选择其他主题；若希望后续启动和重载保留 Pi 自身的主题选择，将 `config.ts` 中的 `themeConfig.defaultTheme` 设为 `null`。此默认值只在终端交互模式应用。
+
+手动安装的用户需将 `themes/tokyo-night.json` 复制到 `~/.pi/agent/themes/tokyo-night.json`（Windows 为 `%USERPROFILE%\.pi\agent\themes\tokyo-night.json`），再执行 `/reload` 即可应用默认主题。`tests/fixtures/tokyo-night.json` 仍为固定测试样本。Shiki 代码高亮继续由 `highlighting.theme` 单独配置。
 
 ## 补丁、更新与停用
 

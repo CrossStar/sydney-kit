@@ -20,10 +20,10 @@ for(const width of [20,80,120]){
  assert.ok(plain[0].startsWith('╭')&&plain[0].endsWith('╮'));
  assert.ok(plain.some(l=>l.startsWith('╰')&&l.endsWith('╯')));
  assert.ok(plain[1].includes('中文'),'no blank row above input');
- assert.equal(editor.borderColor('─'),theme.fg('dim','─'));
+ assert.equal(editor.borderColor('─'),theme.fg('borderMuted','─'));
 }
 editor.borderColor=s=>theme.fg('error',s);editor.render(80);
-assert.equal(editor.borderColor('─'),theme.fg('dim','─'),'host color assignment must not desynchronize borders');
+assert.equal(editor.borderColor('─'),theme.fg('borderMuted','─'),'host color assignment must not desynchronize borders');
 const plain=s=>s.replace(/\x1b\[[0-?]*[ -/]*[@-~]/g,'');
 const label=()=>indicator ? plain(indicator.frames[0]) : undefined;
 const delta=type=>hooks.message_update({assistantMessageEvent:{type}},ctx);

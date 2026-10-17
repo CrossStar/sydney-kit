@@ -19,8 +19,9 @@ const saved=globalThis.__sydneyKit.renderCodeBlock;
 globalThis.__sydneyKit.renderCodeBlock=()=>{throw Error('test')};assert.ok(md('```ts\nx\n```').render(80).join('\n').includes('```'));
 globalThis.__sydneyKit.renderCodeBlock=()=>null;assert.ok(md('```ts\nx\n```').render(80).join('\n').includes('```'));
 globalThis.__sydneyKit.renderCodeBlock=saved;hooks.session_shutdown({},ctx);assert.ok(md('```ts\nx\n```').render(80).join('\n').includes('```'));
-const {features}=await jiti.import(root+'/config.ts');const {default:entry}=await jiti.import(root+'/index.ts');features.footer=false;features.compact=false;features.appearance=false;features.userMessage=false;features.pasteImage=false;features.ternImagePatch=false;features.codeblockPatch=false;
-for(const codeblock of [false,true])for(const diff of [false,true]){features.codeblock=codeblock;features.diff=diff;let tools=0,events=0;entry({on(){events++},registerTool(){tools++}});assert.equal(tools,diff?1:0);assert.equal(events>0,codeblock);}
+const {features}=await jiti.import(root+'/config.ts');const {default:entry}=await jiti.import(root+'/index.ts');features.compactionCard=false;features.footer=false;features.compact=false;features.appearance=false;features.userMessage=false;features.pasteImage=false;features.ternImagePatch=false;features.codeblockPatch=false;
+features.codeblock=false;features.diff=false;let baseEvents=0;entry({on(){baseEvents++}});
+for(const codeblock of [false,true])for(const diff of [false,true]){features.codeblock=codeblock;features.diff=diff;let tools=0,events=0;entry({on(){events++},registerTool(){tools++}});assert.equal(tools,diff?1:0);assert.equal(events>baseEvents,codeblock);}
 delete globalThis.__sydneyKit;delete globalThis.__sydneyKitMarkdownHookVersion;
 const missing={};let warnings=0;cb({on:(n,f)=>missing[n]=f});missing.session_start({}, {...ctx,ui:{...ctx.ui,notify(){warnings++}}});assert.equal(warnings,1);missing.session_shutdown({},ctx);
 console.log('PASS actual patched Markdown: closed/open fences, async redraw, throw/null fallback, unregister, missing-patch warning and independent flags.');process.exit(0);

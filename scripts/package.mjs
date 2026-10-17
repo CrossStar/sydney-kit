@@ -7,7 +7,7 @@ const root=fileURLToPath(new URL('../',import.meta.url));
 const version=JSON.parse(fs.readFileSync(path.join(root,'package.json'),'utf8')).version;
 const files=['index.ts','config.ts','package.json','package-lock.json','README.md','CHANGELOG.md','.gitignore','.gitattributes'];
 function collect(relative){for(const item of fs.readdirSync(path.join(root,relative),{withFileTypes:true})){const name=relative+'/'+item.name;if(item.isSymbolicLink())throw Error('Symlink in distribution: '+name);if(item.isDirectory())collect(name);else files.push(name);}}
-for(const directory of ['src','patches','scripts','vendor','docs','tests','benchmarks'])collect(directory);
+for(const directory of ['src','patches','scripts','vendor','docs','tests','benchmarks','themes'])collect(directory);
 const table=Array.from({length:256},(_,n)=>{for(let i=0;i<8;i++)n=n&1?0xedb88320^(n>>>1):n>>>1;return n>>>0});
 function crc32(buffer){let crc=0xffffffff;for(const byte of buffer)crc=table[(crc^byte)&255]^(crc>>>8);return (crc^0xffffffff)>>>0;}
 let offset=0;const local=[],central=[],manifest=[];
