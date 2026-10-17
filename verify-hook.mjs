@@ -1,0 +1,25 @@
+import assert from 'node:assert/strict';
+import {createJiti} from 'file:///C:/Users/Sydney/.bun/install/global/node_modules/@earendil-works/pi-coding-agent/dist/core/extensions/jiti-loader.js';
+import {Markdown} from 'file:///C:/Users/Sydney/.bun/install/global/node_modules/@earendil-works/pi-tui/dist/index.js';
+import {initTheme} from 'file:///C:/Users/Sydney/.bun/install/global/node_modules/@earendil-works/pi-coding-agent/dist/index.js';
+import {theme,getMarkdownTheme} from 'file:///C:/Users/Sydney/.bun/install/global/node_modules/@earendil-works/pi-coding-agent/dist/modes/interactive/theme/theme.js';
+const root='C:/Users/Sydney/.pi/agent/extensions/sydney-kit';
+const jiti=createJiti(import.meta.url,{alias:{'@earendil-works/pi-coding-agent':'C:/Users/Sydney/.bun/install/global/node_modules/@earendil-works/pi-coding-agent/dist/index.js','@earendil-works/pi-tui':'C:/Users/Sydney/.bun/install/global/node_modules/@earendil-works/pi-tui/dist/index.js'}});
+initTheme('dark');const {default:cb}=await jiti.import(root+'/codeblock.ts');const hl=await jiti.import(root+'/highlight.ts');
+assert.equal(globalThis.__sydneyKitMarkdownHookVersion,'1.3.0');
+const hooks={};let redraws=0;
+const ctx={mode:'tui',ui:{theme,notify(){},setWidget(_key,fn){if(fn)fn({requestRender(){redraws++}},theme)}}};
+cb({on:(name,fn)=>hooks[name]=fn});hooks.session_start({},ctx);
+const md=text=>new Markdown(text,0,0,getMarkdownTheme());
+const open=md('```ts\nconst pending = 1;');assert.ok(open.render(80).some(l=>l.includes('│')));assert.equal(hl.highlightStats.initializations,0);
+const closed=md('```ts\nconst completed = 2;\n```');assert.ok(!closed.render(80).join('\n').includes('```'));
+await hl.settleHighlights();assert.ok(redraws>0);assert.ok(closed.render(80).join('\n').includes('\x1b['));
+const saved=globalThis.__sydneyKit.renderCodeBlock;
+globalThis.__sydneyKit.renderCodeBlock=()=>{throw Error('test')};assert.ok(md('```ts\nx\n```').render(80).join('\n').includes('```'));
+globalThis.__sydneyKit.renderCodeBlock=()=>null;assert.ok(md('```ts\nx\n```').render(80).join('\n').includes('```'));
+globalThis.__sydneyKit.renderCodeBlock=saved;hooks.session_shutdown({},ctx);assert.ok(md('```ts\nx\n```').render(80).join('\n').includes('```'));
+const {features}=await jiti.import(root+'/config.ts');const {default:entry}=await jiti.import(root+'/index.ts');features.footer=false;features.compact=false;features.appearance=false;features.userMessage=false;features.pasteImage=false;features.ternImagePatch=false;features.codeblockPatch=false;
+for(const codeblock of [false,true])for(const diff of [false,true]){features.codeblock=codeblock;features.diff=diff;let tools=0,events=0;entry({on(){events++},registerTool(){tools++}});assert.equal(tools,diff?1:0);assert.equal(events>0,codeblock);}
+delete globalThis.__sydneyKit;delete globalThis.__sydneyKitMarkdownHookVersion;
+const missing={};let warnings=0;cb({on:(n,f)=>missing[n]=f});missing.session_start({}, {...ctx,ui:{...ctx.ui,notify(){warnings++}}});assert.equal(warnings,1);missing.session_shutdown({},ctx);
+console.log('PASS actual patched Markdown: closed/open fences, async redraw, throw/null fallback, unregister, missing-patch warning and independent flags.');process.exit(0);

@@ -1,0 +1,27 @@
+import assert from 'node:assert/strict';
+import {createJiti} from 'file:///C:/Users/Sydney/.bun/install/global/node_modules/@earendil-works/pi-coding-agent/dist/core/extensions/jiti-loader.js';
+import {initTheme} from 'file:///C:/Users/Sydney/.bun/install/global/node_modules/@earendil-works/pi-coding-agent/dist/index.js';
+import {theme} from 'file:///C:/Users/Sydney/.bun/install/global/node_modules/@earendil-works/pi-coding-agent/dist/modes/interactive/theme/theme.js';
+import {visibleWidth} from 'file:///C:/Users/Sydney/.bun/install/global/node_modules/@earendil-works/pi-tui/dist/index.js';
+const jiti=createJiti(import.meta.url,{alias:{'@earendil-works/pi-coding-agent':'C:/Users/Sydney/.bun/install/global/node_modules/@earendil-works/pi-coding-agent/dist/index.js','@earendil-works/pi-tui':'C:/Users/Sydney/.bun/install/global/node_modules/@earendil-works/pi-tui/dist/index.js'}});
+const {default:install}=await jiti.import('C:/Users/Sydney/.pi/agent/extensions/sydney-kit/compact.ts');
+initTheme('dark');let resolver;install({on(){},registerToolRenderer:f=>resolver=f});
+let calls=0;const measured={get colors(){return theme.colors},fg:(...args)=>{calls++;return theme.fg(...args)}};
+const r=resolver('read',()=>undefined),args={path:'test.ts'},ctx={state:{},args,cwd:'F:/Workspace',expanded:true,isError:false,isPartial:false,durationMs:10};
+let c=r.renderCall(args,measured,ctx);
+const result={content:[{type:'text',text:'const x = 1;\n'+ 'console.log(x);\n'.repeat(100)}],details:{}};
+const update=(partial=false)=>r.renderResult(result,{expanded:ctx.expanded,isPartial:partial},measured,{...ctx,isPartial:partial});
+update();const first=c.render(80);const count=calls;assert.deepEqual(c.render(80),first);assert.equal(calls,count,'unchanged renders must not style again');
+const copy=c.render(80);copy[0]='CORRUPTED';assert.notEqual(c.render(80)[0],'CORRUPTED');
+// Host can recreate render callbacks with identical data.
+c=r.renderCall(args,measured,ctx);update();assert.deepEqual(c.render(80),first);assert.equal(calls,count);
+result.content[0].text='const updated = "中文";';update(true);
+assert.ok(c.render(80).join('\n').includes('updated'));assert.ok(!c.render(80).join('\n').includes('console.log'));
+ctx.expanded=false;update();assert.equal(c.render(80).length,1);
+ctx.expanded=true;update();assert.ok(c.render(80).length>1);
+const narrow=c.render(20);assert.ok(narrow.every(l=>visibleWidth(l)<=20));
+const dark=c.render(80);initTheme('light');const light=c.render(80);assert.notDeepEqual(light,dark,'palette changes invalidate colored lines');
+args.path='new.ts';c=r.renderCall(args,measured,ctx);update();assert.ok(c.render(80)[0].includes('new.ts'));
+ctx.isError=true;result.content[0].text='read failed';update();assert.ok(c.render(80)[0].includes('✗'));
+c.render(80);const before=calls;c.invalidate();c.render(80);assert.ok(calls>before);
+console.log('PASS: layout hit, recreated callbacks, copy isolation, in-place stream update, expand/collapse, width, live theme, args, errors and invalidation.');

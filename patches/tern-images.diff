@@ -1,0 +1,11 @@
+--- tui-alt-screen.js.original
++++ tui-alt-screen.js.candidate
+@@ -1503,7 +1503,7 @@
+         // WezTerm erases intersecting Kitty image cells when a later row write touches a covered row.
+         // Draw image placements after every clear and text write so nothing later intersects them; preserve
+         // the existing interleaved output for text-only frames and every other terminal.
+-        const drawKittyImagesLast = redrawImages && this.imageProtocol === "kitty" && screen.some(isImageLine) && isWezTerm;
++        const drawKittyImagesLast = redrawImages && this.imageProtocol === "kitty" && screen.some(isImageLine) && (isWezTerm || process.env.TERM_PROGRAM?.toLowerCase() === "tern"); // sydney-kit Tern ordering
+         if (drawKittyImagesLast) {
+             for (let row = 0; row < height; row++) {
+                 if (!fullRedraw && !imagesNeedRedraw && screen[row] === this.previousScreen[row])

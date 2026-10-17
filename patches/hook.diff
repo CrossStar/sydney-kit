@@ -1,0 +1,27 @@
+--- markdown.js.original
++++ markdown.js.patched
+@@ -1,3 +1,5 @@
++// sydney-kit markdown hook v1 (Pi 1.3.0)
++globalThis.__sydneyKitMarkdownHookVersion = "1.3.0";
+ import { Marked, Tokenizer } from "marked";
+ import { renderLatex } from "../latex.js";
+ import { getCapabilities, hyperlink, isImageLine } from "../terminal-image.js";
+@@ -390,6 +392,18 @@
+                 break;
+             }
+             case "code": {
++                // sydney-kit: presentation only; any failure preserves the stock renderer.
++                try {
++                    const custom = globalThis.__sydneyKit?.renderCodeBlock?.(token.text, token.lang, width, {
++                        raw: token.raw, styled: !!this.defaultTextStyle,
++                        invalidate: () => this.invalidate()
++                    });
++                    if (Array.isArray(custom) && custom.every(line => typeof line === "string")) {
++                        lines.push(...custom);
++                        if (nextTokenType && nextTokenType !== "space") lines.push("");
++                        break;
++                    }
++                } catch { /* Fall back to Pi's original cli-highlight renderer. */ }
+                 const indent = this.theme.codeBlockIndent ?? "  ";
+                 lines.push(this.theme.codeBlockBorder(`\`\`\`${token.lang || ""}`));
+                 if (this.theme.highlightCode) {
