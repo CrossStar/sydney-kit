@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';import fs from 'node:fs/promises';import
 const {createJiti}=await hostImport('pi-coding-agent/dist/core/extensions/jiti-loader.js');
 const root=projectRoot,host=hostRoot;
 const jiti=createJiti(import.meta.url,{alias:{'@earendil-works/pi-coding-agent':host+'/pi-coding-agent/dist/index.js','@earendil-works/pi-tui':host+'/pi-tui/dist/index.js'}});
-const {ensureTernImagePatch,runPatchCommand,default:register}=await jiti.import(root+'/src/host/tern-image-patch.ts');
+const {ensurePatch,runPatchScript,registerHostPatch,ternImagePatch:patch}=await jiti.import(root+'/src/host/host-patches.ts');
+const ensureTernImagePatch=ensurePatch,runPatchCommand=(command,root)=>runPatchScript(patch.script,command,root),register=(pi,run)=>registerHostPatch(pi,patch,run);
 const temp=await fs.mkdtemp(path.join(os.tmpdir(),'sydney-auto-patch-'));
 const op=Symbol.for('sydney-kit.ternImagePatch.operation'),restart=Symbol.for('sydney-kit.ternImagePatch.restartRequired'),oldTerm=process.env.TERM_PROGRAM;
 try{

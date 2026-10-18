@@ -39,9 +39,9 @@ node patches/apply.mjs revert
 
 **应用或撤销后必须重启 Pi；/reload 不会重新加载宿主 Markdown 模块。** 开关变更只需 /reload。
 
-`features.codeblockPatch` 默认 true；仅在 `features.codeblock` 同时开启时注册 `codeblock-patch.ts`。TUI 会话启动时异步执行 `patches/apply.mjs status`，缺失且版本/哈希受支持时自动 apply 并再次验证。不限制终端种类，不在 JSON/RPC 模式执行。成功检查或自动应用后静默，不弹出“补丁已就绪，请重启”警告。自动维护开启时由维护模块报告校验或执行失败，避免代码块模块重复警告。补丁修改后仍需完整重启才能加载宿主代码。
+`features.codeblockPatch` 默认 true；仅在 `features.codeblock` 同时开启时注册（`src/host/host-patches.ts` 中的 `codeblockPatch` 声明）。TUI 会话启动时异步执行 `patches/apply.mjs status`，缺失且版本/哈希受支持时自动 apply 并再次验证。不限制终端种类，不在 JSON/RPC 模式执行。成功检查或自动应用后静默，不弹出“补丁已就绪，请重启”警告。自动维护开启时由维护模块报告校验或执行失败，避免代码块模块重复警告。补丁修改后仍需完整重启才能加载宿主代码。
 
-当前仍只适配 1.3.0 的已验证原文件；同版本重装覆盖可自动恢复，新版本或未知文件修改拒绝自动修改并提示。调用的 Node 命令、6 秒超时和安装根目录集中在 `config.codeblockPatch`；安装位置改变后需调整 packageRoot。进行中的检查跨 /reload 共享，旧会话关闭后不再通知旧 UI。
+当前仍只适配 1.3.0 的已验证原文件；同版本重装覆盖可自动恢复，新版本或未知文件修改拒绝自动修改并提示。调用的 Node 命令、6 秒超时和安装根目录集中在 `config.hostPatches`（三份补丁共用）；安装位置改变后需调整 packageRoot。进行中的检查跨 /reload 共享，旧会话关闭后不再通知旧 UI。
 
 关闭 `features.codeblockPatch` 只停止维护，不撤销磁盘补丁；代码块本身仍可使用已加载钩子，缺失时会提示手动 apply。完全撤销需先关闭维护并 /reload，待已有检查结束后运行 `node patches/apply.mjs revert`，最后完整重启。关闭 `features.codeblock` 也会停止该补丁的自动维护。
 

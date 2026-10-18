@@ -1,6 +1,6 @@
 # Tern 图片补丁自动维护
 
-用户已在 Tern 中确认图片最后绘制的补丁解决滚动闪烁。该补丁现由 sydney-kit 的 tern-image-patch.ts 在启动时维护。
+用户已在 Tern 中确认图片最后绘制的补丁解决滚动闪烁。该补丁现由 sydney-kit 在启动时维护（`src/host/host-patches.ts` 中的 `ternImagePatch` 声明，补丁内容见 `patches/tern-images.mjs`）。
 
 ## 行为
 
@@ -13,7 +13,7 @@ features.ternImagePatch 默认 true。仅在 TUI 模式且 TERM_PROGRAM=tern 时
 
 仍然只适配 Pi / pi-tui **1.3.0** 和脚本内记录的原文件 SHA-256。更新到新版本不会盲目应用旧补丁，需要核对源码并更新适配。插件无法让已经加载的宿主 JS 在 /reload 后换成新版本：自动补回后仍需完整重启一次。
 
-这项维护只管理 Tern 图片绘制顺序补丁。代码块钩子现在也有独立启动维护（features.codeblockPatch、codeblock-patch.ts），复用原有 patches/apply.mjs；详见 HIGHLIGHT.md。
+这项维护只管理 Tern 图片绘制顺序补丁。代码块钩子与压缩卡片使用同一套维护器和 `patches/engine.mjs`；详见 HIGHLIGHT.md 与 COMPACTION-CARD.md。
 
 ## 配置
 
@@ -21,7 +21,7 @@ config.ts：
 
 ```ts
 features.ternImagePatch = true;
-ternImagePatch = {
+hostPatches = {  // 三份补丁共用
   nodeCommand: 'node',
   timeoutMs: 6000,
   packageRoot: resolveHostRoot(),

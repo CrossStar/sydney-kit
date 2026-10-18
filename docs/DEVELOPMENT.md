@@ -26,7 +26,7 @@
 
 - npm test：全部独立脚本，遇到失败停止。
 - node scripts/test.mjs codeblock：仅匹配名称的测试。
-- npm run patch:status：检查两份补丁。
+- npm run patch:status：检查三份补丁。
 - npm run package：生成 dist/sydney-kit-0.1.0.zip 和 manifest.json。
 
 测试不会启动新的 Pi 或模型会话。补丁维护测试在隔离副本中修改文件，实际宿主只做状态检查；Windows 图片测试生成自己的样本。
@@ -39,6 +39,9 @@
 
 配置开关修改后 /reload；宿主补丁变化后完整重启。代码块补丁成功维护时静默，不恢复已经移除的重启警告。
 
-## 后续重构边界
+## 宿主补丁
 
-本轮优先完成目录归类、可迁移路径、测试入口和打包流程。两份补丁的 CLI、哈希与备份格式继续保留；补丁引擎统一和 diff 内部职责拆分留在后续独立变更中，避免与文件迁移混在一起。迁移前后的行为由现有回归套件对照。
+- patches/engine.mjs 统一负责版本检查、哈希校验、备份、原子写入和 status/apply/revert CLI。各补丁脚本只声明 target、backupSuffix、originalSha256 和 transform。
+- 支持的 Pi 版本只在 src/host/version.mjs 中定义；补丁、备份文件名和代码块钩子检查都引用它。适配新版本时，还需要核对各脚本中的原文件哈希和锚点。
+- src/host/host-patches.ts 声明三份补丁的启动维护（脚本、提示文案、触发条件），并共用同一套去重、重启提示和失败提示逻辑。
+- CLI 参数、status 输出字段和备份文件名属于对外格式，修改时需要保持兼容。

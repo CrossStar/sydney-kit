@@ -92,10 +92,7 @@ npm ci
 
 ### 设置补丁安装路径
 
-**首次加载前确认路径**。若不是默认的 Bun 全局安装，可设置环境变量 `SYDNEY_KIT_PI_ROOT`，或在插件的 `config.ts` 中修改以下两项：
-
-- `codeblockPatch.packageRoot`
-- `ternImagePatch.packageRoot`
+**首次加载前确认路径**。若不是默认的 Bun 全局安装，可设置环境变量 `SYDNEY_KIT_PI_ROOT`，或在插件的 `config.ts` 中修改 `hostPatches.packageRoot`（三份补丁共用）。
 
 这个目录应同时包含 `pi-coding-agent/` 和 `pi-tui/`，通常是安装目录中的 `node_modules/@earendil-works/`。默认使用当前用户的 Bun 全局安装目录，也可以通过环境变量 `SYDNEY_KIT_PI_ROOT` 指定；其他安装方式需确认路径。
 
@@ -105,6 +102,7 @@ npm ci
 features.codeblock = false;
 features.codeblockPatch = false;
 features.ternImagePatch = false;
+features.compactionCard = false;
 ```
 
 其他界面功能可以继续使用。补丁目前只适配 **Pi / pi-tui 1.3.0** 的已验证文件，新版本需要重新适配。
@@ -144,6 +142,7 @@ export const features = {
   pasteImage: true,      // Windows 图片粘贴
   ternImagePatch: true,  // Tern 图片补丁维护
   codeblockPatch: true,  // 代码块钩子补丁维护
+  compactionCard: true,  // 上下文压缩卡片补丁维护
 };
 ```
 
@@ -158,18 +157,19 @@ export const features = {
 | `pasteImage.maxEdge` | `2000` | 图片最长边像素数。 |
 | `highlighting.theme` | `github-dark-dimmed` | Shiki 代码高亮主题。 |
 
-输入框、分隔线和正文颜色还会受到当前 Pi 主题影响。本插件附带 `themes/tokyo-night.json`，保留现有测试样本中的配色。使用 `pi install` 安装后，启动或执行 `/reload` 时会默认应用 `tokyo-night`。可在 `/settings` → **Theme** 中临时选择其他主题；若希望后续启动和重载保留 Pi 自身的主题选择，将 `config.ts` 中的 `themeConfig.defaultTheme` 设为 `null`。此默认值只在终端交互模式应用。
+输入框、分隔线和正文颜色还会受到当前 Pi 主题影响。本插件附带 `themes/tokyo-night.json`，保留现有测试样本中的配色。使用 `pi install` 安装后，启动或执行 `/reload` 时会默认应用 `tokyo-night`。可在 `/settings` → **Theme** 中选择其他主题；Pi 保存该选择后，插件在后续启动和重载时不再覆盖。此默认值只在终端交互模式应用。
 
 手动安装的用户需将 `themes/tokyo-night.json` 复制到 `~/.pi/agent/themes/tokyo-night.json`（Windows 为 `%USERPROFILE%\.pi\agent\themes\tokyo-night.json`），再执行 `/reload` 即可应用默认主题。`tests/fixtures/tokyo-night.json` 仍为固定测试样本。Shiki 代码高亮继续由 `highlighting.theme` 单独配置。
 
 ## 补丁、更新与停用
 
-两份补丁均修改 Pi 安装目录中的文件，并保留原文件备份：
+三份补丁均修改 Pi 安装目录中的文件，并保留原文件备份。它们共用 `patches/engine.mjs` 中的版本、哈希、备份与原子写入逻辑：
 
 | 补丁 | 自动维护条件 | 管理脚本 |
 | --- | --- | --- |
 | 代码块渲染钩子 | TUI 模式，`codeblock` 与 `codeblockPatch` 均开启 | `patches/apply.mjs` |
 | Tern 图片绘制顺序 | TUI 模式，`TERM_PROGRAM=tern`，`ternImagePatch` 开启 | `patches/tern-images.mjs` |
+| 上下文压缩卡片 | TUI 模式，`compactionCard` 开启 | `patches/compaction-card.mjs` |
 
 Pi 更新或重装可能覆盖补丁。同一受支持版本的原文件被覆盖后，插件可以自动补回；未知版本、未知文件修改或损坏的备份会使自动处理停止并提示。成功补回后仍需完整重启 Pi。
 
@@ -178,11 +178,12 @@ Pi 更新或重装可能覆盖补丁。同一受支持版本的原文件被覆�
 ```powershell
 node patches/apply.mjs status --root "D:/path/to/node_modules/@earendil-works"
 node patches/tern-images.mjs status --root "D:/path/to/node_modules/@earendil-works"
+node patches/compaction-card.mjs status --root "D:/path/to/node_modules/@earendil-works"
 ```
 
 将 `status` 替换为 `apply` 或 `revert`，可以手动应用或撤销。**手动脚本不会读取 `config.ts` 中的路径，请显式传入 `--root`。**
 
-关闭补丁开关只停止自动维护，不撤销已经写入的补丁。要完全停用：先关闭两个补丁维护开关并 `/reload`，待已有检查结束后执行各自的 `revert`，完整退出 Pi，再移除插件文件夹。
+关闭补丁开关只停止自动维护，不撤销已经写入的补丁。要完全停用：先关闭三个补丁维护开关并 `/reload`，待已有检查结束后执行各自的 `revert`，完整退出 Pi，再移除插件文件夹。
 
 更新 Sydney Kit 前，建议保留自己的 `config.ts` 设置。替换源码、安装依赖后再对照新配置合并设置，避免直接覆盖掉新增选项。
 

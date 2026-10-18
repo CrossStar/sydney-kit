@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';import fs from 'node:fs/promises';import
 const {createJiti}=await hostImport('pi-coding-agent/dist/core/extensions/jiti-loader.js');
 const root=projectRoot,host=hostRoot;
 const jiti=createJiti(import.meta.url,{alias:{'@earendil-works/pi-coding-agent':host+'/pi-coding-agent/dist/index.js','@earendil-works/pi-tui':host+'/pi-tui/dist/index.js'}});
-const {ensureCodeblockPatch,runPatchCommand,default:register}=await jiti.import(root+'/src/host/codeblock-patch.ts');
+const {ensurePatch,runPatchScript,registerHostPatch,codeblockPatch:patch}=await jiti.import(root+'/src/host/host-patches.ts');
+const ensureCodeblockPatch=ensurePatch,runPatchCommand=(command,root)=>runPatchScript(patch.script,command,root),register=(pi,run)=>registerHostPatch(pi,patch,run);
 const temp=await fs.mkdtemp(path.join(os.tmpdir(),'sydney-codeblock-auto-'));
 const key=Symbol.for('sydney-kit.codeblockPatch.operation');
 const drain=async()=>{await globalThis[key]?.catch(()=>{});await new Promise(setImmediate);};

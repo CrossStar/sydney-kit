@@ -2,6 +2,7 @@ import type { ExtensionAPI } from '@earendil-works/pi-coding-agent';
 import { truncateToWidth, visibleWidth, wrapTextWithAnsi } from '@earendil-works/pi-tui';
 import { highlightSync } from './highlight';
 import { codeblocks as config, features } from '../../config';
+import { PI_HOST_VERSION } from '../host/version.mjs';
 export function isClosed(raw:string):boolean {
   const first=raw.split('\n')[0].match(/^\s*(`{3,}|~{3,})/);
   if(!first)return true;
@@ -25,7 +26,7 @@ export default function registerCodeblock(pi:ExtensionAPI){
   const g=globalThis as any;let hook:any,previous:any,tui:any;let active=false;
   pi.on('session_start',(_event,ctx)=>{
     if(ctx.mode!=='tui')return;
-    if(g.__sydneyKitMarkdownHookVersion!==config.patchVersion){if(!features.codeblockPatch)ctx.ui.notify('代码块钩子未加载：已应用补丁请完整重启 Pi；未应用请在 sydney-kit 目录运行 node patches/apply.mjs apply 后重启。','warning');return;}
+    if(g.__sydneyKitMarkdownHookVersion!==PI_HOST_VERSION){if(!features.codeblockPatch)ctx.ui.notify('代码块钩子未加载：已应用补丁请完整重启 Pi；未应用请在 sydney-kit 目录运行 node patches/apply.mjs apply 后重启。','warning');return;}
     active=true;
     ctx.ui.setWidget('sydney-kit-codeblock',(_tui)=>{tui=_tui;return {render:()=>[],invalidate(){}};});
     g.__sydneyKit??={};previous=g.__sydneyKit.renderCodeBlock;

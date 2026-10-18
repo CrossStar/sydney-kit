@@ -10,7 +10,7 @@
   "scripts": {
     "test": "node scripts/test.mjs",
     "package": "node scripts/package.mjs",
-    "patch:status": "node patches/apply.mjs status && node patches/tern-images.mjs status"
+    "patch:status": "node patches/apply.mjs status && node patches/tern-images.mjs status && node patches/compaction-card.mjs status"
   },
   "pi": {
     "extensions": [
