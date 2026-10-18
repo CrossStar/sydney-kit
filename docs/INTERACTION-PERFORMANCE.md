@@ -28,7 +28,7 @@ footer.ts 现在按 sessionManager、getLeafId()、模型 provider/id/contextWin
 - 读取到文件后先插入短占位，解码/缩放/附件快照在后台完成；真正发送时等待准备结果。
 - 清理操作移出占位显示的关键路径。
 - 已发送消息保留带尺寸的图片标记。
-- image-editor.ts 用公开 editor factory 包装当前编辑器，Backspace 删除整个图片占位，保留原编辑器的其他行为和普通多行粘贴。没有修改宿主或原型。
+- image-editor.ts 提供输入框装饰器，由 src/ui/editor.ts 的 EditorPipeline 叠加在底座（appearance 的提示符输入框，或原有编辑器）之上，Backspace 删除整个图片占位，保留原编辑器的其他行为和普通多行粘贴。没有修改宿主或原型。
 - `benchmark-sydney-clipboard.mjs` 比较单次 PowerShell 与预热后的读取，不更改系统剪贴板。本次无图片剪贴板测量中，单次进程调用为 7299.72 ms；复用进程预热为 213.97 ms，随后三次读取为 15.81 / 1.29 / 0.47 ms。首个单次调用只有一个样本，可能含冷启动/系统扫描成本，不能当成稳定均值；本结果也不包含真实截图保存和缩放时间。
 
 ## 后台工具标签

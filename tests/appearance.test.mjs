@@ -7,10 +7,10 @@ const {getEditorTheme,theme}=await hostImport('pi-coding-agent/dist/modes/intera
 const {visibleWidth}=await hostImport('pi-tui/dist/index.js');
 const jiti=createJiti(import.meta.url,{alias:{'@earendil-works/pi-coding-agent':hostPath('pi-coding-agent/dist/index.js'),'@earendil-works/pi-tui':hostPath('pi-tui/dist/index.js')}});
 const root=projectRoot;initTheme('dark');
-const {default:install}=await jiti.import(root+'/src/ui/appearance.ts');
-const hooks={};let factory,indicator,message;const previous=()=>{};
-const ctx={mode:'tui',ui:{theme,getEditorComponent:()=>previous,setEditorComponent:f=>factory=f,setWorkingIndicator:x=>indicator=x,setWorkingMessage:x=>message=x}};
-install({on:(name,fn)=>hooks[name]=fn});hooks.session_start({},ctx);
+const {default:install}=await jiti.import(root+'/src/ui/appearance.ts');const {default:registerEditor,EditorPipeline}=await jiti.import(root+'/src/ui/editor.ts');
+const hooks={},editorHooks={};const previous=()=>{};let factory=previous,indicator,message;
+const ctx={mode:'tui',ui:{theme,getEditorComponent:()=>factory,setEditorComponent:f=>factory=f,setWorkingIndicator:x=>indicator=x,setWorkingMessage:x=>message=x}};
+const pipeline=new EditorPipeline();pipeline.setBase(install({on:(name,fn)=>hooks[name]=fn}));registerEditor({on:(name,fn)=>editorHooks[name]=fn},pipeline);editorHooks.session_start({},ctx);
 const editor=factory({requestRender(){},terminal:{rows:40,columns:80}},getEditorTheme(),new KeybindingsManager());
 editor.setText('中文 input test');
 for(const width of [20,80,120]){
@@ -44,5 +44,5 @@ delta('thinking_delta');assert.equal(indicator,undefined,'late events must not r
 hooks.agent_start({},ctx);hooks.tool_execution_start({toolCallId:'cancelled'},ctx);
 hooks.agent_end({},ctx);hooks.tool_execution_end({toolCallId:'cancelled'},ctx);assert.equal(indicator,undefined);
 hooks.agent_start({},ctx);assert.equal(label(),'Working…');hooks.session_switch({},ctx);assert.equal(indicator,undefined);
-hooks.session_shutdown({},ctx);assert.equal(factory,previous);
+hooks.session_shutdown({},ctx);editorHooks.session_shutdown({},ctx);assert.equal(factory,previous);
 console.log('PASS: real prompt editor widths; event-driven phases; stable animation; parallel tools; cancellation/late events; session reset and editor restoration.');

@@ -4,7 +4,7 @@
 
 | 目录 | 职责 |
 | --- | --- |
-| src/ui | 输入框、用户消息、状态栏 |
+| src/ui | 输入框、用户消息、状态栏；editor.ts 是唯一调用 setEditorComponent 的位置，按“底座 + 装饰器”固定顺序组装 |
 | src/tools | 工具摘要、名称关联、渲染缓存、write 前快照 |
 | src/rendering | Shiki、代码块、diff（模型与视图分离） |
 | src/clipboard | 剪贴板进程、图片附件、占位编辑 |

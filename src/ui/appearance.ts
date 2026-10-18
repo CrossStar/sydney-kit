@@ -1,10 +1,10 @@
 import { CustomEditor, type ExtensionAPI, type ExtensionContext } from '@earendil-works/pi-coding-agent';
+import type { EditorBase } from './editor';
 import { createPromptEditorClass } from '../../vendor/prompt-editor';
 import { appearance } from '../../config';
 
 type Phase = keyof typeof appearance.statusLabels;
-export default function registerAppearance(pi: ExtensionAPI) {
-  let previous: any;
+export default function registerAppearance(pi: ExtensionAPI): EditorBase {
   let active = false;
   let phase: Phase = 'working';
   let displayed: Phase | undefined;
@@ -26,20 +26,6 @@ export default function registerAppearance(pi: ExtensionAPI) {
     active=false;phase='working';displayed=undefined;tools.clear();
     if (wasActive && ctx.mode==='tui') {ctx.ui.setWorkingIndicator();ctx.ui.setWorkingMessage();}
   }
-  pi.on('session_start', (_event, ctx) => {
-    if (ctx.mode !== 'tui') return;
-    previous = ctx.ui.getEditorComponent();
-    const Editor = createPromptEditorClass(CustomEditor, text => ctx.ui.theme.fg('accent', text), appearance.boxedEditor);
-    class MatchedBorderEditor extends Editor {
-      override render(width: number): string[] {
-        // The host assigns thinking-level border colors on mode changes.
-        // This editor deliberately keeps its public borderColor aligned with message rules.
-        this.borderColor = text => ctx.ui.theme.fg(appearance.borderColor, text);
-        return super.render(width);
-      }
-    }
-    ctx.ui.setEditorComponent((tui, theme, keys) => new MatchedBorderEditor(tui, theme, keys));
-  });
   pi.on('agent_start', (_event, ctx) => {
     active=true;phase='working';displayed=undefined;tools.clear();update(ctx);
   });
@@ -64,8 +50,18 @@ export default function registerAppearance(pi: ExtensionAPI) {
   pi.on('agent_end', (_event, ctx) => reset(ctx));
   pi.on('agent_settled', (_event, ctx) => reset(ctx));
   pi.on('session_switch', (_event, ctx) => reset(ctx));
-  pi.on('session_shutdown', (_event, ctx) => {
-    reset(ctx);
-    if (ctx.mode==='tui') ctx.ui.setEditorComponent(previous);
-  });
+  pi.on('session_shutdown', (_event, ctx) => reset(ctx));
+
+  return ctx => {
+    const Editor = createPromptEditorClass(CustomEditor, text => ctx.ui.theme.fg('accent', text), appearance.boxedEditor);
+    class MatchedBorderEditor extends Editor {
+      override render(width: number): string[] {
+        // The host assigns thinking-level border colors on mode changes.
+        // This editor deliberately keeps its public borderColor aligned with message rules.
+        this.borderColor = text => ctx.ui.theme.fg(appearance.borderColor, text);
+        return super.render(width);
+      }
+    }
+    return (tui, theme, keys) => new MatchedBorderEditor(tui, theme, keys);
+  };
 }

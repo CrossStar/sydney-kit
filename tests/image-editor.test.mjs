@@ -6,10 +6,10 @@ const {initTheme}=await hostImport('pi-coding-agent/dist/index.js');
 const {getEditorTheme,theme}=await hostImport('pi-coding-agent/dist/modes/interactive/theme/theme.js');
 const jiti=createJiti(import.meta.url,{alias:{'@earendil-works/pi-coding-agent':hostPath('pi-coding-agent/dist/index.js'),'@earendil-works/pi-tui':hostPath('pi-tui/dist/index.js')}});
 const root=projectRoot;initTheme('dark');
-const {installImageEditor}=await jiti.import(root+'/src/clipboard/image-editor.ts'),{default:appearance}=await jiti.import(root+'/src/ui/appearance.ts');
-let factory;const events={};const ctx={mode:'tui',ui:{theme,getEditorComponent:()=>factory,setEditorComponent:f=>factory=f}};
-appearance({on:(n,f)=>events[n]=f});events.session_start({},ctx);const original=factory;
-const restore=installImageEditor(ctx,t=>/^\[图片 [12](?: · \d+×\d+)?\]$/.test(t));
+const {imageBackspace}=await jiti.import(root+'/src/clipboard/image-editor.ts'),{default:appearance}=await jiti.import(root+'/src/ui/appearance.ts'),{EditorPipeline}=await jiti.import(root+'/src/ui/editor.ts');
+const original=()=>{};let factory=original;const ctx={mode:'tui',ui:{theme,getEditorComponent:()=>factory,setEditorComponent:f=>factory=f}};
+const pipeline=new EditorPipeline();pipeline.decorate(imageBackspace(t=>/^\[图片 [12](?: · \d+×\d+)?\]$/.test(t)));pipeline.setBase(appearance({on(){}}));
+const restore=pipeline.install(ctx);
 const editor=factory({requestRender(){},terminal:{rows:40,columns:100}},getEditorTheme(),new KeybindingsManager());
 for(const [text,expected] of [['prefix [图片 1]','prefix '],['prefix [图片 1] ','prefix '],['[图片 1] [图片 2]','[图片 1] '],['[图片 1 · 1280×720]',''],['plain','plai'],['[图片 999]','[图片 999'],['[abc]','[abc']]){editor.setText(text);editor.handleInput('\x7f');assert.equal(editor.getText(),expected);}
 const middle='prefix [图片 1] suffix';editor.setText(middle);for(let i=0;i<7;i++)editor.handleInput('\x1b[D');editor.handleInput('\x7f');assert.equal(editor.getText(),'prefix  suffix');assert.equal(editor.getCursor().col,7);
@@ -17,5 +17,5 @@ editor.setText(middle);for(let i=0;i<middle.length-10;i++)editor.handleInput('\x
 editor.setText('');editor.handleInput('\x1b[200~first\nsecond\x1b[201~');assert.equal(editor.getExpandedText(),'first\nsecond');
 editor.setText('');editor.handleInput('\x1b[200~'+'x'.repeat(3000)+'\x1b[201~');editor.insertTextAtCursor(' [图片 1]');editor.handleInput('\x7f');assert.equal(editor.getExpandedText(),'x'.repeat(3000)+' ');
 assert.ok(editor.render(100).some(l=>l.includes('❯')));restore();assert.equal(factory,original);
-const restoreAgain=installImageEditor(ctx,()=>true);const replacement=()=>{};factory=replacement;restoreAgain();assert.equal(factory,replacement);
+const restoreAgain=pipeline.install(ctx);const replacement=()=>{};factory=replacement;restoreAgain();assert.equal(factory,replacement);
 console.log('PASS whole-token Backspace at end/inside/middle, adjacent tokens, ordinary text, multi-line and large-paste preservation, boxed editor composition and safe restoration.');process.exit(0);
