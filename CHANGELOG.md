@@ -4,6 +4,14 @@
 
 - 重设计聊天历史压缩卡片：单行折叠、主题语义色、精确压缩前 token 数和可读摘要；保留宿主展开行为及窄终端宽度边界。
 - 增加 Pi 1.3.0 可逆宿主补丁、渲染与补丁回归测试及重启说明。
+- 架构整理（渲染输出、补丁产物与备份格式不变）：
+  - 三份宿主补丁共用 `patches/engine.mjs` 与 `src/host/host-patches.ts`；支持版本集中在 `src/host/version.mjs`。
+  - **配置变更**：`codeblockPatch` / `ternImagePatch` / `compactionCardPatch` 合并为 `hostPatches`；`codeblocks.patchVersion` 与 `compact` 中的内部正则移出配置。
+  - `npm run patch:status` 增加压缩卡片补丁。
+  - diff 拆为模型与视图（`src/rendering/diff/`），write 快照移至 `src/tools/write-snapshot.ts`。
+  - 输入框由 `src/ui/editor.ts` 统一组装，不再依赖事件注册顺序。
+  - 工具输出按类别拆分为 presenters，工具名集中在 `catalog.ts`。
+  - 修正 README 中的补丁数量、`compactionCard` 开关，删除不存在的 `themeConfig` 说明。
 
 ## 0.1.0
 
