@@ -58,15 +58,32 @@ clipboard-bridge  ◀── ssh RemoteForward ──  /tmp/sydney-kit-<用户名
 
    `%r` 是远端用户名，与插件默认的 `pasteImage.bridgeSocket`（`/tmp/sydney-kit-{user}.sock`）对应。也可以临时用 `ssh -R /tmp/sydney-kit-$USER.sock:127.0.0.1:7395 devbox`。
 
-3. **服务器 sshd 配置**（需要 sudo）：在 `/etc/ssh/sshd_config` 中加入下面一行，然后执行 `sudo systemctl reload ssh`（部分发行版服务名为 `sshd`）：
+3. **服务器 sshd 配置**（有 sudo 权限时）：在 `/etc/ssh/sshd_config` 中加入下面一行，然后执行 `sudo systemctl reload ssh`（部分发行版服务名为 `sshd`）。没有 sudo 权限可跳过这一步，使用下方的清理方式：
 
    ```
    StreamLocalBindUnlink yes
    ```
 
-   连接异常断开时，socket 文件会留在服务器上。没有这一项，下次连接会提示 `remote port forwarding failed for listen path` 并且无法转发；此时手动删除 `/tmp/sydney-kit-<用户名>.sock` 即可恢复。开启后，新连接会自动替换旧的 socket；同时打开多个连接时，以最新的连接为准。
+   SSH 连接关闭后（包括正常退出），socket 文件可能仍留在服务器上。没有这一项，下次连接会提示 `remote port forwarding failed for listen path` 并且无法转发；需要在建立新转发之前删除遗留的 socket。开启后，新连接会自动替换旧的 socket；同时打开多个连接时，以最新的连接为准。
 
 4. 重新 SSH 登录，在远端 Pi 中照常按 Alt+V。
+
+### 没有 sudo 权限
+
+不需要修改 sshd 配置：保留本地桥接和 `RemoteForward` 配置，每次重新连接前先清理自己账号的旧 socket。先关闭原来使用此 socket 的 SSH 连接，再在**本地终端**依次运行：
+
+```bash
+ssh -o ClearAllForwardings=yes -o ControlPath=none devbox "rm -f -- /tmp/sydney-kit-REMOTE_USER.sock"
+ssh -o ControlPath=none -o ExitOnForwardFailure=yes devbox
+```
+
+把 `devbox` 换成 SSH 配置中的主机别名，把 `REMOTE_USER` 换成**服务器上的用户名**（即 `%r`，不一定等于本地用户名）。如果自定义了 socket 路径，清理路径也要相应修改。命令适用于本地 Bash、zsh 和 PowerShell。
+
+第一条命令临时禁用转发，只删除自己遗留的 socket，不需要 sudo；成功后再执行第二条，建立新的转发并登录。`ControlPath=none` 避免复用旧 SSH 连接，`ExitOnForwardFailure=yes` 让转发失败时直接退出。清理命令失败时先处理报错，不要继续连接。
+
+不要删除仍由其他会话使用的 socket，否则那些会话将无法继续通过该路径读取剪贴板。若已经出现转发失败提示，仅在当前会话里删除 socket 不会自动重建转发，需要退出后重新连接。
+
+此方法要求服务器本来就允许远程 Unix socket 转发；如果管理员禁用了转发，清理 socket 无法绕过限制，需要联系管理员开启。
 
 ### 行为
 
