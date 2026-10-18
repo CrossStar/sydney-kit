@@ -1,6 +1,8 @@
 import {projectRoot,hostRoot,hostPath,hostImport} from './helpers/paths.mjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 const {createJiti}=await hostImport('pi-coding-agent/dist/core/extensions/jiti-loader.js');
 const {visibleWidth}=await hostImport('pi-tui/dist/index.js');
 const root=projectRoot;
@@ -36,7 +38,7 @@ for(const name of ['bash','read','edit','write','grep','unknown_mcp'])for(const 
  ctx.isError=true;r.renderResult({content:[{type:'text',text:'error1\nerror2\nerror3\nerror4'}]}, {expanded:false,isPartial:false},theme,ctx);assert.equal(component.render(80).length,4);assert.ok(component.render(80)[0].startsWith('✗'));assert.ok(component.render(80)[1].startsWith('    '));
 }
 const old=projectRoot+'/tests/fixtures/original-footer.ts';
-const fixture=fs.mkdtempSync((process.env.TEMP ?? '.')+'/sydney-footer-');
+const fixture=fs.mkdtempSync(path.join(os.tmpdir(),'sydney-footer-'));
 fs.writeFileSync(fixture+'/original.ts',fs.readFileSync(fs.existsSync(old)?old:old+'.bak'));
 let original;
 try { original=await jiti.import(fixture+'/original.ts'); } finally { fs.rmSync(fixture,{recursive:true,force:true}); }
@@ -46,7 +48,7 @@ for(const width of [1,20,64,65,80,85,120])for(const percent of [0,79,80,89,90,10
  assert.deepEqual(render(original.default),render(migrated.default));
 }
 const sdk=await hostImport('pi-coding-agent/dist/index.js');
-const os=await import('node:os');const path=await import('node:path');
+
 const temp=fs.mkdtempSync(path.join(os.tmpdir(),'sydney-kit-'));
 try {
  for(const [name,args] of [['write',{path:'sample.txt',content:'hello\n'}],['read',{path:'sample.txt'}],['edit',{path:'sample.txt',edits:[{oldText:'hello',newText:'hello Sydney'}]}],['bash',{command:'rg hello sample.txt'}],['bash',{command:"powershell.exe -NoProfile -Command 'Write-Output ok'"}],['bash',{command:"powershell.exe -NoProfile -Command '1..1000'"}]]){

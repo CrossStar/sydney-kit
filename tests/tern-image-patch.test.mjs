@@ -9,7 +9,7 @@ const op=Symbol.for('sydney-kit.ternImagePatch.operation'),restart=Symbol.for('s
 try{
  for(const pkg of ['pi-coding-agent','pi-tui']){await fs.mkdir(path.join(temp,pkg),{recursive:true});await fs.copyFile(path.join(host,pkg,'package.json'),path.join(temp,pkg,'package.json'));}
  const target=path.join(temp,'pi-tui/dist/tui-alt-screen.js');await fs.mkdir(path.dirname(target),{recursive:true});
- const original=await fs.readFile(host+'/pi-tui/dist/tui-alt-screen.js.sydney-tern-images-1.3.0.bak');await fs.writeFile(target,original);
+ const stock=host+'/pi-tui/dist/tui-alt-screen.js',backup=stock+'.sydney-tern-images-1.3.0.bak';const original=await fs.readFile(await fs.access(backup).then(()=>backup,()=>stock));await fs.writeFile(target,original);
  let commands=[];const run=command=>{commands.push(command);return runPatchCommand(command,temp)};
  assert.equal(await ensureTernImagePatch(run),'applied');assert.deepEqual(commands,['status','apply','status']);
  const patched=await fs.readFile(target);commands=[];assert.equal(await ensureTernImagePatch(run),'present');assert.deepEqual(commands,['status']);assert.deepEqual(await fs.readFile(target),patched);
