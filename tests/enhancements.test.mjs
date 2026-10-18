@@ -10,7 +10,7 @@ const config=await jiti.import(root+'/config.ts');const hl=await jiti.import(roo
 if(process.argv.includes('--failure')){config.highlighting.theme='sydney-theme-does-not-exist';assert.deepEqual(await hl.highlight('const x = 1;','ts'),['const x = 1;']);assert.equal(hl.highlightStats.initializations,1);console.log('PASS initialization failure -> plain text');process.exit(0);}
 const {default:entry}=await jiti.import(root+'/index.ts');
 if(process.argv.includes('--startup')){const on=process.argv.includes('--on');config.features.diff=on;config.features.codeblock=on;entry({on(){},registerToolRenderer(){},registerTool(){},registerCommand(){},registerShortcut(){},registerMarkdownTransformer(){}});console.log(JSON.stringify({on,loadAndRegisterMs:performance.now()-start,shikiInitializations:hl.highlightStats.initializations}));process.exit(0);}
-initTheme('dark');const cb=await jiti.import(root+'/src/rendering/codeblock.ts');const df=await jiti.import(root+'/src/rendering/diff.ts');
+initTheme('dark');const cb=await jiti.import(root+'/src/rendering/codeblock.ts');const df=await jiti.import(root+'/src/rendering/diff/index.ts');const {default:writeSnapshot}=await jiti.import(root+'/src/tools/write-snapshot.ts');
 assert.equal(hl.highlightStats.initializations,0);
 assert.equal(cb.isClosed('```ts\nlet x = 1;'),false);assert.equal(cb.isClosed('```ts\nx\n```'),true);
 cb.renderBlock('long '.repeat(1000),'ts',80,theme,false);assert.equal(hl.highlightStats.initializations,0,'streaming open fences must not initialize');
@@ -21,23 +21,23 @@ for(const [lang,code] of [['ts','const value = 1;'],['python','def x():\n    ret
 const strip=s=>s.replace(/\x1b\[[0-?]*[ -/]*[@-~]/g,'');
 for(const [oldText,newText,filename] of [['const n=1;','const n=2;','a.ts'],['a\nb\nc\nd\ne','A\nb\nc\nd\nE','a.py'],['','新文件\n第二行','new.txt'],['a\n'.repeat(300),'b\n'.repeat(300),'large.ts'],['你好 Sydney','你好 世界','a.ts'],['old','new','a.unsupported']]){
  const patch=df.makePatch(filename,oldText,newText);await hl.highlight(oldText,filename.split('.').pop());await hl.highlight(newText,filename.split('.').pop());
- const rich=df.enhancedDiff(patch,filename,theme,true,()=>{});assert.ok(rich);assert.ok(rich.added+rich.removed>0);assert.ok(!/\x1b\[(?:48|7)[;m]/.test(rich.lines.join('\n')));
+ const rich=df.enhancedDiff(patch,filename,theme,{expanded:true,previewLines:config.compact.editPreviewLines,onReady:()=>{}});assert.ok(rich);assert.ok(rich.added+rich.removed>0);assert.ok(!/\x1b\[(?:48|7)[;m]/.test(rich.lines.join('\n')));
  const plain=rich.lines.map(strip).join('\n');assert.ok(plain.includes(newText.split('\n')[0]));
- const folded=df.enhancedDiff(patch,filename,theme,false,()=>{});assert.ok(folded.lines.length<=7);
+ const folded=df.enhancedDiff(patch,filename,theme,{expanded:false,previewLines:config.compact.editPreviewLines,onReady:()=>{}});assert.ok(folded.lines.length<=7);
 }
 assert.equal(config.diffs.sideBySide,false,'default layout is unified');
 config.diffs.sideBySide=true;
 for(const width of [72,80,120,160]){
  for(const [before,after] of [['head\nold\ntail','head\nnew\nextra\ntail'],['','新建文件'],['removed',''],['const s = "'+'原'.repeat(200)+'";','const s = "'+'新'.repeat(300)+'";']]){
   const patch=df.makePatch('split.ts',before,after);
-  const rich=df.enhancedDiff(patch,'split.ts',theme,true,()=>{},width);
+  const rich=df.enhancedDiff(patch,'split.ts',theme,{expanded:true,previewLines:config.compact.editPreviewLines,onReady:()=>{},width:width});
   assert.ok(rich);assert.ok(strip(rich.lines[0]).includes('修改前'));assert.ok(strip(rich.lines[0]).includes('修改后'));
   assert.ok(rich.lines.every(line=>visibleWidth(line)<=width),'split columns must respect terminal width');
   const plain=rich.lines.map(strip);
   if(before.includes('原'))assert.equal((plain.join('\n').match(/原/g)??[]).length,200,'wrapped old content preserved');
   if(after.includes('新'.repeat(10)))assert.equal((plain.join('\n').match(/新/g)??[]).length,300,'wrapped new content preserved');
-  assert.ok(!df.enhancedDiff(patch,'split.ts',theme,true,()=>{},50).lines[0].includes('修改前'));
-  const preview=df.enhancedDiff(patch,'split.ts',theme,false,()=>{},width).lines;
+  assert.ok(!df.enhancedDiff(patch,'split.ts',theme,{expanded:true,previewLines:config.compact.editPreviewLines,onReady:()=>{},width:50}).lines[0].includes('修改前'));
+  const preview=df.enhancedDiff(patch,'split.ts',theme,{expanded:false,previewLines:config.compact.editPreviewLines,onReady:()=>{},width:width}).lines;
   assert.ok(preview[0].includes('修改前'));
   assert.ok(preview.length<=8,'preview has header, at most six comparison rows, optional more hint');
   assert.ok(!preview.some(l=>l.includes('@@')));
@@ -81,24 +81,24 @@ for(let pass=0;pass<3;pass++){for(const component of owners){component.invalidat
 assert.equal(hl.highlightStats.jobs,jobsAfterPrepare,'component-owned highlights survive global cache eviction');
 assert.ok(ownerRedraws<=24);config.highlighting.cacheEntries=savedLimit;
 const six=df.makePatch('limit.txt','a\n'.repeat(6),'b\n'.repeat(6));
-assert.equal(df.enhancedDiff(six,'limit.txt',theme,false,()=>{},100).lines.length,7);
+assert.equal(df.enhancedDiff(six,'limit.txt',theme,{expanded:false,previewLines:config.compact.editPreviewLines,onReady:()=>{},width:100}).lines.length,7);
 const seven=df.makePatch('limit.txt','a\n'.repeat(7),'b\n'.repeat(7));
-assert.equal(df.enhancedDiff(seven,'limit.txt',theme,false,()=>{},100).lines.length,8);
-const numbered=df.enhancedDiff(df.makePatch('n.txt','head\ntail','head\ninsert\ntail'),'n.txt',theme,true,()=>{},100).lines.map(strip);
+assert.equal(df.enhancedDiff(seven,'limit.txt',theme,{expanded:false,previewLines:config.compact.editPreviewLines,onReady:()=>{},width:100}).lines.length,8);
+const numbered=df.enhancedDiff(df.makePatch('n.txt','head\ntail','head\ninsert\ntail'),'n.txt',theme,{expanded:true,previewLines:config.compact.editPreviewLines,onReady:()=>{},width:100}).lines.map(strip);
 assert.ok(numbered.some(line=>/2 tail/.test(line.split(' │ ')[0])&&/3 tail/.test(line.split(' │ ')[1])),'context uses distinct old/new line numbers');
 config.diffs.sideBySide=false;
-const defaultPreview=df.enhancedDiff(df.makePatch('default.ts','const n=1;','const n=2;'),'default.ts',theme,false,()=>{},100);
+const defaultPreview=df.enhancedDiff(df.makePatch('default.ts','const n=1;','const n=2;'),'default.ts',theme,{expanded:false,previewLines:config.compact.editPreviewLines,onReady:()=>{},width:100});
 assert.ok(!defaultPreview.lines.some(line=>line.includes('修改前')));
 const longCode='const huge = "'+'z'.repeat(5000)+'";';const jobsBefore=hl.highlightStats.jobs;
 assert.deepEqual(await hl.highlight(longCode,'ts'),[longCode]);assert.equal(hl.highlightStats.jobs,jobsBefore,'pathological long lines skip grammar without losing content');
 const longPatch=df.makePatch('huge.ts','const huge = "'+'a'.repeat(5000)+'";',longCode);
-const fullLong=df.enhancedDiff(longPatch,'huge.ts',theme,true,()=>{},100).lines.map(strip).join('\n');
+const fullLong=df.enhancedDiff(longPatch,'huge.ts',theme,{expanded:true,previewLines:config.compact.editPreviewLines,onReady:()=>{},width:100}).lines.map(strip).join('\n');
 assert.ok(fullLong.includes('z'.repeat(5000)),'expanded view retains full long content');
 let notices=0;const ready=()=>notices++;
 for(let n=0;n<12;n++)hl.highlightSync('const notificationTest = 99;','ts',ready);
 await hl.settleHighlights();assert.equal(notices,1,'same component subscribes only once');
 const temp=fs.mkdtempSync(path.join(os.tmpdir(),'sydney-write-diff-'));
-try{let tool;df.default({registerTool:t=>tool=t});const ctx={cwd:temp};let r=await tool.execute('one',{path:'new.ts',content:'const n=1;'},undefined,undefined,ctx);assert.ok(r.details.sydneyNewFile);assert.ok(r.details.sydneyDiffPatch);r=await tool.execute('two',{path:'new.ts',content:'const n=2;'},undefined,undefined,ctx);assert.ok(!r.details.sydneyNewFile);assert.equal(fs.readFileSync(path.join(temp,'new.ts'),'utf8'),'const n=2;');}finally{fs.rmSync(temp,{recursive:true,force:true});}
+try{let tool;writeSnapshot({registerTool:t=>tool=t});const ctx={cwd:temp};let r=await tool.execute('one',{path:'new.ts',content:'const n=1;'},undefined,undefined,ctx);assert.ok(r.details.sydneyNewFile);assert.ok(r.details.sydneyDiffPatch);r=await tool.execute('two',{path:'new.ts',content:'const n=2;'},undefined,undefined,ctx);assert.ok(!r.details.sydneyNewFile);assert.equal(fs.readFileSync(path.join(temp,'new.ts'),'utf8'),'const n=2;');}finally{fs.rmSync(temp,{recursive:true,force:true});}
 await hl.settleHighlights();
 assert.equal(hl.highlightStats.initializations,1);console.log('PASS codeblock cases, open stream, diff cases, no backgrounds, write delegation and shared single initialization');
 console.log('activeResources',process.getActiveResourcesInfo());

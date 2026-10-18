@@ -4,7 +4,7 @@
 
 Pi / pi-tui 1.3.0；扩展自身依赖 `diff@9.0.0`、`shiki@4.5.0`、`@shikijs/cli@4.5.0`，锁定于 package-lock.json。CLI 的 Shiki 依赖已 dedupe，使用同一个 singleton。pi-diff 与 pi-pretty 均未安装、未配置启用。
 
-完整代码在 highlight.ts、codeblock.ts、diff.ts；入口与开关分别在 index.ts、config.ts。已有 footer、compact、userMessage、appearance 开关保留。
+完整代码在 src/rendering 的 highlight.ts、codeblock.ts 和 diff/（model 行模型与词级范围、split/unified 两种视图、emphasize 强调层），write 工具快照在 src/tools/write-snapshot.ts；入口与开关分别在 index.ts、config.ts。已有 footer、compact、userMessage、appearance 开关保留。
 
 ## 调研与实现选择
 

@@ -5,8 +5,8 @@
 | 目录 | 职责 |
 | --- | --- |
 | src/ui | 输入框、用户消息、状态栏 |
-| src/tools | 工具摘要、名称关联、渲染缓存 |
-| src/rendering | Shiki、代码块、diff |
+| src/tools | 工具摘要、名称关联、渲染缓存、write 前快照 |
+| src/rendering | Shiki、代码块、diff（模型与视图分离） |
 | src/clipboard | 剪贴板进程、图片附件、占位编辑 |
 | src/host | 补丁维护和宿主安装路径 |
 | patches | 已验证的补丁脚本及差异；保留现有 CLI 与备份格式 |

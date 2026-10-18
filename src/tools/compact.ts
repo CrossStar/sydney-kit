@@ -1,6 +1,6 @@
 import { highlightCode, getLanguageFromPath, renderDiff } from '@earendil-works/pi-coding-agent';
 import { appearance, features } from '../../config';
-import { enhancedDiff } from '../rendering/diff';
+import { enhancedDiff } from '../rendering/diff/index';
 import type { ExtensionAPI, ToolRenderContext } from '@earendil-works/pi-coding-agent';
 import { truncateToWidth, visibleWidth, wrapTextWithAnsi } from '@earendil-works/pi-tui';
 import { compact as cfg } from '../../config';
@@ -38,7 +38,7 @@ export default function registerCompact(pi: ExtensionAPI) {
           const failed = ctx.isError || web?.error || (typeof state.result?.details?.exitCode === 'number' && state.result.details.exitCode !== 0);
           const diff = typeof state.result?.details?.diff === 'string' ? state.result.details.diff : typeof state.result?.details?.patch === 'string' ? state.result.details.patch : '';
           const patch=state.result?.details?.sydneyDiffPatch ?? state.result?.details?.patch;
-          const rich=features.diff && ['edit','write'].includes(name) && typeof patch==='string' ? enhancedDiff(patch,String(state.args.path??''),theme,ctx.expanded,state.diffReady,Math.max(0,width-visibleWidth(cfg.indent)),state.diffHighlights??=new Map(),state.diffModelCache??={}) : undefined;
+          const rich=features.diff && ['edit','write'].includes(name) && typeof patch==='string' ? enhancedDiff(patch,String(state.args.path??''),theme,{expanded:ctx.expanded,previewLines:cfg.editPreviewLines,onReady:state.diffReady,width:Math.max(0,width-visibleWidth(cfg.indent)),highlightCache:state.diffHighlights??=new Map(),modelCache:state.diffModelCache??={}}) : undefined;
           const changes = diff.split('\n').filter((l: string) => /^[+-]/.test(l) && !/^(\+\+\+|---)/.test(l));
           const edited = name === 'edit' && !!diff;
           let stat = state.result ? (output ? `${lineCount(output)} ${lineCount(output) === 1 ? 'line' : 'lines'}` : 'ok') : '…';
