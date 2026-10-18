@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- 剪贴板图片粘贴支持 macOS（Pi 自带原生模块）、Linux（wl-paste / xclip）和 WSL，不再仅限 Windows；支持文件管理器复制的图片文件。BMP/TIFF 改用 SDK 的 `convertToPng` 转换，删除 `image-to-png.ps1`。
+- 通过 SSH 粘贴本地剪贴板图片：本地运行 `npm run clipboard-bridge`，配合 `RemoteForward /tmp/sydney-kit-%r.sock 127.0.0.1:7395`。新增配置 `pasteImage.bridgePort` / `bridgeSocket` / `bridgeTimeoutMs`。
+- 图片粘贴测试改用纯 JS 生成的样本，可在非 Windows 平台运行；删除 `verify-image-fixtures.ps1`。
 - 重设计聊天历史压缩卡片：单行折叠、主题语义色、精确压缩前 token 数和可读摘要；保留宿主展开行为及窄终端宽度边界。
 - 增加 Pi 1.3.0 可逆宿主补丁、渲染与补丁回归测试及重启说明。
 - 架构整理（渲染输出、补丁产物与备份格式不变）：

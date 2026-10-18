@@ -14,7 +14,7 @@
 | 输入框与运行状态 | 圆角边框、`❯` 提示符，以及跟随实际事件变化的工作状态。 |
 | 用户消息分隔 | 用细线区分消息，不添加时间戳，保留原始正文。 |
 | 状态栏 | 查看模型、思考等级、上下文使用量、当前路径和 Git 分支等信息。 |
-| 图片粘贴 | Windows 下按 `Alt+V` 添加真实图片附件，支持连续粘贴多张和整段删除图片占位。 |
+| 图片粘贴 | 按 `Alt+V` 添加真实图片附件（Windows、macOS、Linux，以及通过 SSH 的远端会话），支持连续粘贴多张和整段删除图片占位。 |
 | 网页与后台任务摘要 | 为已有的搜索、抓取和后台任务工具提供易读摘要；后台工具名称保留 `bg` 标识。 |
 | 补丁维护 | 自动检查代码块钩子、上下文压缩卡片，以及 Tern 的图片滚动兼容补丁；通过版本和文件校验后才应用。 |
 
@@ -121,11 +121,11 @@ Git 安装通过 `package.json` 中声明的 `index.ts` 加载；手动安装则
 
 - **查看工具详情**：使用 Pi 的 `Ctrl+O` 展开或折叠工具结果。默认隐藏原始参数 JSON，保留结果与错误。
 - **查看改动**：edit / write 默认预览最多 6 行改动，展开后查看完整差异。
-- **粘贴图片**：复制图片或资源管理器中的图片文件，按 `Alt+V`。编辑器会出现 `[图片 1]`，发送后保留带尺寸的标记，并附加实际图片数据。
+- **粘贴图片**：复制图片或文件管理器中的图片文件，按 `Alt+V`。编辑器会出现 `[图片 1]`，发送后保留带尺寸的标记，并附加实际图片数据。
 - **删除图片**：光标位于图片占位内或末尾时，按 Backspace 删除整个占位。
 - **修改配置**：编辑 `config.ts` 后执行 `/reload`；修改宿主补丁后则需要完整重启。
 
-图片粘贴要求 Windows 剪贴板环境和支持图片输入的模型。默认将图片长边限制为 2000 像素。未发送图片的关联保存在内存中，执行 `/reload` 或切换会话后，需要重新粘贴草稿中的图片。
+图片粘贴需要支持图片输入的模型。Windows 使用 PowerShell，macOS 使用 Pi 自带的原生剪贴板组件；在 macOS 上需要把终端的 Option 键设为 Meta，`Alt+V` 才能生效，也可以把 `pasteImage.shortcut` 改为 `ctrl+v`。Linux 在 Wayland 下需要 `wl-clipboard`，在 X11 下需要 `xclip`；WSL 读取不到图片时，会改从 Windows 剪贴板读取。通过 SSH 运行时，在本地运行 `npm run clipboard-bridge`，并在 SSH 配置中加一行 `RemoteForward`，远端 Pi 就能粘贴本地剪贴板中的图片，配置步骤见 [SSH 图片粘贴](docs/PASTE-IMAGE.md#ssh)。默认将图片长边限制为 2000 像素。未发送图片的关联保存在内存中，执行 `/reload` 或切换会话后，需要重新粘贴草稿中的图片。
 
 ## 配置
 
@@ -139,7 +139,7 @@ export const features = {
   appearance: true,      // 输入框与运行状态
   codeblock: true,       // 代码块样式与高亮
   diff: true,            // 文件差异预览
-  pasteImage: true,      // Windows 图片粘贴
+  pasteImage: true,      // 剪贴板图片粘贴
   ternImagePatch: true,  // Tern 图片补丁维护
   codeblockPatch: true,  // 代码块钩子补丁维护
   compactionCard: true,  // 上下文压缩卡片补丁维护
@@ -155,6 +155,7 @@ export const features = {
 | `compact.webPreviewLines` | `4` | 网页工具的折叠预览行数。 |
 | `pasteImage.shortcut` | `alt+v` | 图片粘贴快捷键。 |
 | `pasteImage.maxEdge` | `2000` | 图片最长边像素数。 |
+| `pasteImage.bridgeSocket` | `/tmp/sydney-kit-{user}.sock` | SSH 剪贴板桥接在服务器上使用的 socket 路径，需要与 `RemoteForward` 一致。 |
 | `highlighting.theme` | `github-dark-dimmed` | Shiki 代码高亮主题。 |
 
 输入框、分隔线和正文颜色还会受到当前 Pi 主题影响。本插件附带 `themes/tokyo-night.json`，保留现有测试样本中的配色。使用 `pi install` 安装后，启动或执行 `/reload` 时会默认应用 `tokyo-night`。可在 `/settings` → **Theme** 中选择其他主题；Pi 保存该选择后，插件在后续启动和重载时不再覆盖。此默认值只在终端交互模式应用。
@@ -208,7 +209,7 @@ npm run package
 npm run patch:status
 ```
 
-`npm test` 运行独立验证脚本，不启动 Pi 或模型会话。`paste-image` 测试需要 Windows PowerShell；Markdown 钩子集成测试要求代码块补丁已应用。其余测试也可在 Linux 上运行。`npm run package` 在 `dist/` 生成源码 ZIP 和文件哈希清单，不包含 `node_modules`。开发环境、安装同步及回退见 [开发指南](docs/DEVELOPMENT.md)。
+`npm test` 运行独立验证脚本，不启动 Pi 或模型会话。Markdown 钩子集成测试要求代码块补丁已应用；装有 Xvfb 和 xclip 时，剪贴板测试会额外跑一次真实 X11 读取。`npm run package` 在 `dist/` 生成源码 ZIP 和文件哈希清单，不包含 `node_modules`。开发环境、安装同步及回退见 [开发指南](docs/DEVELOPMENT.md)。
 
 ## 更多说明
 

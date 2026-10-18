@@ -1,28 +1,31 @@
-import { execFile } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { mkdir, readFile, readdir, stat, unlink, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { extname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { resizeImage, type ExtensionAPI } from '@earendil-works/pi-coding-agent';
+import { convertToPng, resizeImage, type ExtensionAPI } from '@earendil-works/pi-coding-agent';
 import { pasteImage as config } from '../../config';
-import { ClipboardClient } from './clipboard-client';
+import { ClipboardUnavailable, createClipboardReader } from './clipboard-reader';
 import { imageTokens, placeholder, tokenKey, withSize } from './image-token';
 type Prepared={path:string;mimeType:string;width:number;height:number};
 export const clipboardDirectory=()=>config.directory.replace(/^~(?=[/\\])/,homedir());
 const filename=(extension:string)=>join(clipboardDirectory(),`clipboard-${new Date().toISOString().replace(/[:.]/g,'-')}-${randomUUID()}${extension}`);
-const mime:Record<string,string>={'.png':'image/png','.jpg':'image/jpeg','.jpeg':'image/jpeg','.gif':'image/gif','.webp':'image/webp','.bmp':'image/bmp'};
-function powershell(script:string,args:string[],signal?:AbortSignal):Promise<string>{
-  return new Promise((resolve,reject)=>execFile('powershell.exe',['-NoLogo','-NoProfile','-NonInteractive','-STA','-ExecutionPolicy','Bypass','-File',fileURLToPath(new URL(`../../scripts/windows/${script}`,import.meta.url)),...args],{windowsHide:true,timeout:config.processTimeoutMs,maxBuffer:1024*1024,encoding:'utf8',signal},(error,stdout)=>error?reject(error):resolve(stdout)));
+const mime:Record<string,string>={'.png':'image/png','.jpg':'image/jpeg','.jpeg':'image/jpeg','.gif':'image/gif','.webp':'image/webp','.bmp':'image/bmp','.tif':'image/tiff','.tiff':'image/tiff'};
+async function saveClipboardBytes(bytes:Buffer,extension:string){
+  if(bytes.length>config.maxFileBytes)throw Error('Oversized image');
+  await mkdir(clipboardDirectory(),{recursive:true});
+  const path=filename(extension);await writeFile(path,bytes,{flag:'wx'});return path;
 }
 export async function prepareImage(source:string,signal?:AbortSignal):Promise<Prepared>{
   await mkdir(clipboardDirectory(),{recursive:true});
   const size=await stat(source);if(!size.isFile()||size.size>config.maxFileBytes)throw Error('Invalid or oversized image');
   let format=mime[extname(source).toLowerCase()];if(!format)throw Error('Unsupported image');
-  if(format==='image/bmp'){
-    const png=filename('.png');await powershell('image-to-png.ps1',['-Source',source,'-Destination',png],signal);source=png;format='image/png';
+  let bytes=await readFile(source);
+  // resizeImage returns small inputs unchanged, so formats models cannot take are transcoded first.
+  if(format==='image/bmp'||format==='image/tiff'){
+    const png=await convertToPng(bytes.toString('base64'),format);if(!png)throw Error('Image conversion failed');
+    bytes=Buffer.from(png.data,'base64');format='image/png';
   }
-  const result=await resizeImage(await readFile(source),format,{maxWidth:config.maxEdge,maxHeight:config.maxEdge});
+  const result=await resizeImage(bytes,format,{maxWidth:config.maxEdge,maxHeight:config.maxEdge});
   if(!result||!['image/png','image/jpeg','image/gif','image/webp'].includes(result.mimeType))throw Error('Image decode failed');
   if(signal?.aborted)throw Error('Cancelled');
   const destination=filename(({ 'image/png':'.png','image/jpeg':'.jpg','image/gif':'.gif','image/webp':'.webp' } as Record<string,string>)[result.mimeType]);
@@ -33,7 +36,7 @@ export async function cleanupClipboardFiles(protectedFiles=new Set<string>()){
   const directory=clipboardDirectory(),cutoff=Date.now()-config.retentionDays*86400000;
   await mkdir(directory,{recursive:true});
   for(const entry of await readdir(directory,{withFileTypes:true})){
-    if(!entry.isFile()||!/^clipboard-.*\.(png|jpg|gif|webp)$/i.test(entry.name))continue;
+    if(!entry.isFile()||!/^clipboard-.*\.(png|jpg|gif|webp|bmp|tiff)$/i.test(entry.name))continue;
     const path=join(directory,entry.name);if(protectedFiles.has(path))continue;
     try{if((await stat(path)).mtimeMs<cutoff)await unlink(path);}catch{}
   }
@@ -41,23 +44,22 @@ export async function cleanupClipboardFiles(protectedFiles=new Set<string>()){
 type Services={read:(signal?:AbortSignal)=>Promise<string[]>;prepare:typeof prepareImage;cleanup:typeof cleanupClipboardFiles};
 export default function registerPasteImage(pi:ExtensionAPI, services?:Services){
   type Pending={source:string;ready:Promise<Prepared|undefined>;image?:Prepared};
-  const pending=new Map<string,Pending>();const client=new ClipboardClient(clipboardDirectory(),config.processTimeoutMs);
-  const ops=services??{read:(signal?:AbortSignal)=>client.read(signal),prepare:prepareImage,cleanup:cleanupClipboardFiles};
+  const pending=new Map<string,Pending>();const reader=createClipboardReader(clipboardDirectory(),saveClipboardBytes);
+  const ops=services??{read:(signal?:AbortSignal)=>reader.read(signal),prepare:prepareImage,cleanup:cleanupClipboardFiles};
   let serial=0,generation=0,busy=false,lastCleanup=0;
   const controllers=new Set<AbortController>();
   const supported=(ctx:any)=>ctx.model?.input?.includes('image')===true;
   const reset=()=>{generation++;for(const controller of controllers)controller.abort();controllers.clear();pending.clear();};
   pi.on('session_start',(_event,ctx)=>{
     reset();if(ctx?.mode!=='tui')return;
-    if(!services&&process.platform==='win32')void client.warm().catch(()=>{});
+    if(!services)reader.warm();
   });
   pi.on('session_switch',reset);
-  pi.on('session_shutdown',()=>{reset();client.stop();});
+  pi.on('session_shutdown',()=>{reset();reader.stop();});
   pi.registerShortcut(config.shortcut,{description:'粘贴剪贴板图片',handler:async ctx=>{
     if(ctx.mode!=='tui')return;
     if(!supported(ctx)){ctx.ui.notify('当前模型不支持图片输入','warning');return;}
     if(busy){ctx.ui.notify('正在读取剪贴板图片，请稍候','info');return;}
-    if(process.platform!=='win32'){ctx.ui.notify('剪贴板图片粘贴目前仅支持 Windows','warning');return;}
     busy=true;const current=generation,abort=new AbortController();controllers.add(abort);let preparing=false;
     try{
       const paths=await ops.read(abort.signal);
@@ -83,7 +85,7 @@ export default function registerPasteImage(pi:ExtensionAPI, services?:Services){
         for(const [token,entry] of pending)if(ctx.ui.getEditorText().includes(token)){protectedFiles.add(entry.source);if(entry.image)protectedFiles.add(entry.image.path);}
         void ops.cleanup(protectedFiles).catch(()=>{});
       }
-    }catch{if(current===generation)ctx.ui.notify('读取或保存剪贴板图片失败，请重试','error');}
+    }catch(error){if(current===generation)ctx.ui.notify(error instanceof ClipboardUnavailable?error.message:'读取或保存剪贴板图片失败，请重试',error instanceof ClipboardUnavailable?'warning':'error');}
     finally{busy=false;if(!preparing)controllers.delete(abort);}
   }});
   pi.on('input',async(event,ctx)=>{

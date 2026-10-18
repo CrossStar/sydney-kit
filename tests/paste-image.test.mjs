@@ -1,18 +1,18 @@
-import {projectRoot,hostRoot,hostPath,hostImport} from './helpers/paths.mjs';
-import assert from 'node:assert/strict';import fs from 'node:fs/promises';import os from 'node:os';import path from 'node:path';import {execFileSync} from 'node:child_process';
+import {projectRoot,hostRoot,hostPath,hostImport} from './helpers/paths.mjs';import {writeImageFixtures} from './helpers/image-fixtures.mjs';
+import assert from 'node:assert/strict';import fs from 'node:fs/promises';import os from 'node:os';import path from 'node:path';
 const {createJiti}=await hostImport('pi-coding-agent/dist/core/extensions/jiti-loader.js');
 const root=projectRoot;
 const jiti=createJiti(import.meta.url,{alias:{'@earendil-works/pi-coding-agent':hostPath('pi-coding-agent/dist/index.js'),'@earendil-works/pi-tui':hostPath('pi-tui/dist/index.js')}});
 const mod=await jiti.import(root+'/src/clipboard/paste-image.ts');const {pasteImage:config,features}=await jiti.import(root+'/config.ts');
 const temp=await fs.mkdtemp(path.join(os.tmpdir(),'sydney-paste-test-'));config.directory=path.join(temp,'clipboard');
 try{
- execFileSync('powershell.exe',['-NoProfile','-STA','-File',root+'/scripts/windows/verify-image-fixtures.ps1','-Directory',temp],{timeout:20000});
- await fs.writeFile(path.join(temp,'small.webp'),Buffer.from('UklGRiQAAABXRUJQVlA4TBcAAAAvP8AHAAfQypK1vf8BICH8P69G9D/1AQA=','base64'));
+ await writeImageFixtures(temp);
  const prepared=[];
- for(const name of ['small.png','small.jpg','small.gif','small.bmp','large.png','small.webp']){
+ for(const name of ['small.png','small.jpg','small.gif','small.bmp','large.png','small.webp','small.tiff']){
   const item=await mod.prepareImage(path.join(temp,name));prepared.push(item);
   assert.ok(item.width<=2000&&item.height<=2000);assert.ok(['image/png','image/jpeg','image/gif','image/webp'].includes(item.mimeType));
   if(name==='large.png'){assert.equal(item.width,2000);assert.equal(item.height,500);}
+  if(name==='small.bmp'||name==='small.tiff'){assert.equal(item.mimeType,'image/png');assert.equal(item.width,64);}
  }
  const original=await fs.readFile(path.join(temp,'small.png'));assert.ok(original.length>0);
  const stale=path.join(config.directory,'clipboard-stale.png'),protectedPath=prepared[0].path,unrelated=path.join(config.directory,'keep-me.png');
@@ -46,6 +46,6 @@ try{
  release(prepared[0]);const completed=await lateEvents.input({text:editor,source:'interactive'},ctx);assert.ok(completed.text.includes('[图片 1 · 64×32]'));assert.equal(completed.images.length,1);lateEvents.session_shutdown();
  const {default:entry}=await jiti.import(root+'/index.ts');for(const key of Object.keys(features))features[key]=false;let registered=0;
  const pi={on(){},registerShortcut(){registered++}};entry(pi);assert.equal(registered,0);features.pasteImage=true;entry(pi);assert.equal(registered,1);
- console.log('PASS actual PNG/JPEG/GIF/BMP/WebP decode, 4000x1000 -> 2000x500; retention cleanup; cursor placeholders; multiple images; input image bytes; text/empty/error/model guards; feature off; only alt+v registered.');
+ console.log('PASS actual PNG/JPEG/GIF/BMP/TIFF/WebP decode, 4000x1000 -> 2000x500; retention cleanup; cursor placeholders; multiple images; input image bytes; text/empty/error/model guards; feature off; only alt+v registered.');
 }finally{await fs.rm(temp,{recursive:true,force:true});}
 process.exit(0);
