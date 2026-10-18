@@ -16,7 +16,7 @@
 | 状态栏 | 查看模型、思考等级、上下文使用量、当前路径和 Git 分支等信息。 |
 | 图片粘贴 | Windows 下按 `Alt+V` 添加真实图片附件，支持连续粘贴多张和整段删除图片占位。 |
 | 网页与后台任务摘要 | 为已有的搜索、抓取和后台任务工具提供易读摘要；后台工具名称保留 `bg` 标识。 |
-| 补丁维护 | 自动检查代码块钩子，以及 Tern 的图片滚动兼容补丁；通过版本和文件校验后才应用。 |
+| 补丁维护 | 自动检查代码块钩子、上下文压缩卡片，以及 Tern 的图片滚动兼容补丁；通过版本和文件校验后才应用。 |
 
 插件只为已有网页、后台任务和 Fusion 工具优化显示，不负责安装这些工具。
 
@@ -85,10 +85,10 @@ Windows 对应目录为 `%USERPROFILE%\.pi\agent\extensions\sydney-kit\`。确�
 
 ```powershell
 cd "$env:USERPROFILE\.pi\agent\extensions\sydney-kit"
-npm ci
+npm ci --legacy-peer-deps
 ```
 
-源码包不包含 `node_modules`，需要这一步安装 Shiki 等依赖。
+源码包不包含 `node_modules`，需要这一步安装 Shiki 等依赖。`package-lock.json` 目前不记录 Pi 自身的 peer 依赖，因此需要加 `--legacy-peer-deps`；Pi 的包由宿主提供，不会重复安装。
 
 ### 设置补丁安装路径
 
@@ -115,7 +115,7 @@ features.compactionCard = false;
 /reload
 ```
 
-Git 安装通过 `package.json` 中声明的 `index.ts` 加载；手动安装则由扩展目录发现入口。首次安装若自动应用了代码块或 Tern 补丁，**需要完整退出并重启 Pi**，才能加载修改后的宿主代码。代码块补丁成功处理时保持静默。
+Git 安装通过 `package.json` 中声明的 `index.ts` 加载；手动安装则由扩展目录发现入口。首次安装若自动应用了宿主补丁，**需要完整退出并重启 Pi**，才能加载修改后的宿主代码。代码块补丁成功处理时保持静默；Tern 和压缩卡片补丁会提示重启。
 
 ## 日常使用
 
@@ -187,9 +187,20 @@ node patches/compaction-card.mjs status --root "D:/path/to/node_modules/@earendi
 
 更新 Sydney Kit 前，建议保留自己的 `config.ts` 设置。替换源码、安装依赖后再对照新配置合并设置，避免直接覆盖掉新增选项。
 
+从 0.1.0 更新时注意：`codeblockPatch`、`ternImagePatch`、`compactionCardPatch` 三项补丁配置已合并为 `hostPatches`，自定义过 `packageRoot` 的需迁移到 `hostPatches.packageRoot`。手动安装的副本还应删除已移除的旧文件（`src/host/codeblock-patch.ts`、`src/host/tern-image-patch.ts`、`src/host/compaction-card-patch.ts`、`src/rendering/diff.ts`、`src/tools/web.ts`、`src/tools/presentations.ts`），避免残留两套实现。
+
 ## 项目开发
 
-源码按职责放在 `src/ui`、`src/tools`、`src/rendering`、`src/clipboard` 和 `src/host`。根目录的 `index.ts` 只负责注册，`config.ts` 保留为统一配置入口。
+根目录的 `index.ts` 只负责按开关注册和组装，`config.ts` 是统一配置入口。源码按职责划分：
+
+| 目录 | 职责 | 扩展方式 |
+| --- | --- | --- |
+| `src/ui` | 状态栏、用户消息、运行状态；`editor.ts` 统一组装输入框 | 输入框功能以“底座”或“装饰器”加入 `EditorPipeline`，不直接调用 `setEditorComponent` |
+| `src/tools` | 紧凑工具输出：`catalog.ts` 记录工具名，`presenters/` 按工具类别生成摘要，`status` / `layout` / `body` 负责表头与正文 | 新工具类别新增一个 presenter，并登记到 `presenters/index.ts` |
+| `src/rendering` | Shiki 高亮、代码块、`diff/`（行模型与上下 / 双栏视图） | 视图只消费 `diff/model.ts` 的行模型 |
+| `src/clipboard` | 剪贴板进程、图片附件、占位删除 | 占位格式集中在 `image-token.ts` |
+| `src/host` | 宿主补丁启动维护、支持版本、安装路径、钩子全局约定 | 新补丁在 `patches/` 写一份声明，并在 `host-patches.ts` 登记 |
+| `patches` | `engine.mjs` 统一版本 / 哈希 / 备份 / 原子写入；各脚本只声明目标与改动 | 适配新 Pi 版本时修改 `src/host/version.mjs` 并核对各脚本哈希与锚点 |
 
 ```powershell
 npm test
@@ -197,14 +208,17 @@ npm run package
 npm run patch:status
 ```
 
-`npm test` 运行独立验证脚本，不启动 Pi 或模型会话；当前完整套件包含 Windows 和已应用宿主钩子的集成测试。`npm run package` 在 `dist/` 生成源码 ZIP 和文件哈希清单，不包含 `node_modules`。开发环境、安装同步及回退见 [开发指南](docs/DEVELOPMENT.md)。
+`npm test` 运行独立验证脚本，不启动 Pi 或模型会话。`paste-image` 测试需要 Windows PowerShell；Markdown 钩子集成测试要求代码块补丁已应用。其余测试也可在 Linux 上运行。`npm run package` 在 `dist/` 生成源码 ZIP 和文件哈希清单，不包含 `node_modules`。开发环境、安装同步及回退见 [开发指南](docs/DEVELOPMENT.md)。
 
 ## 更多说明
 
 - [代码高亮、diff 与代码块钩子](docs/HIGHLIGHT.md)
 - [图片粘贴与附件行为](docs/PASTE-IMAGE.md)
 - [Tern 图片兼容补丁](docs/TERN-IMAGE-PATCH.md)
+- [上下文压缩卡片](docs/COMPACTION-CARD.md)
+- [默认主题](docs/THEME.md)
 - [渲染性能与缓存](docs/INTERACTION-PERFORMANCE.md)
-- [界面模块与迁移说明](docs/archive/MIGRATION.md)
+- [开发与目录维护](docs/DEVELOPMENT.md)
+- [界面模块与迁移说明（历史）](docs/archive/MIGRATION.md)
 
 使用其他会替换输入框、工具渲染器或状态栏的扩展时，可能需要关闭重叠功能。终端图片是否正常显示，还取决于终端支持的图片协议和 Pi 的对应设置。
