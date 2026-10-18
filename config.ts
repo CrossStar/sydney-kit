@@ -16,7 +16,4 @@ export const compact = {
   mutationTools: ['edit', 'write', 'apply_patch'],
   indent: '    ', ellipsis: '…',
   aliases: { powershell: 'ps', pwsh: 'ps' } as Record<string, string>,
-  summaryFields: ['path', 'file_path', 'query', 'queries', 'pattern', 'command', 'url', 'urls', 'name', 'objective', 'claim', 'prompt'],
-  powershellWrapper: /^\s*(?:powershell|pwsh)(?:\.exe)?\s+(?:-NoProfile\s+)?-Command\s+([\s\S]*)$/i,
-  encodingPrelude: /^\s*\[Console\]::OutputEncoding\s*=\s*[^;]*;\s*/i,
 };
