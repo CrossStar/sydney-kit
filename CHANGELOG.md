@@ -5,6 +5,10 @@
 - 剪贴板图片粘贴支持 macOS（Pi 自带原生模块）、Linux（wl-paste / xclip）和 WSL，不再仅限 Windows；支持文件管理器复制的图片文件。BMP/TIFF 改用 SDK 的 `convertToPng` 转换，删除 `image-to-png.ps1`。
 - 通过 SSH 粘贴本地剪贴板图片：本地运行 `npm run clipboard-bridge`，配合 `RemoteForward /tmp/sydney-kit-%r.sock 127.0.0.1:7395`。新增配置 `pasteImage.bridgePort` / `bridgeSocket` / `bridgeTimeoutMs`。
 - 图片粘贴测试改用纯 JS 生成的样本，可在非 Windows 平台运行；删除 `verify-image-fixtures.ps1`。
+- **归档宿主补丁，不再默认执行**：代码块钩子、上下文压缩卡片和 Tern 图片补丁连同代码块渲染器移至 `archive/host-patches/`，插件不再修改 Pi 安装目录。原因：Pi 1.3.0 的 `pi` 命令运行 `dist/bundle`，补丁修改的未打包文件不会被加载，补丁实际上没有生效且没有提示。
+  - **配置变更**：删除 `features.codeblock`、`codeblockPatch`、`ternImagePatch`、`compactionCard` 以及 `codeblocks`、`hostPatches`；删除 `npm run patch:status`。
+  - 助手回复中的代码块改由 Pi 自带渲染器显示；diff 的 Shiki 高亮不受影响。
+  - 已应用的补丁不会自动撤销，可用归档目录中的脚本手动 revert。
 - 重设计聊天历史压缩卡片：单行折叠、主题语义色、精确压缩前 token 数和可读摘要；保留宿主展开行为及窄终端宽度边界。
 - 增加 Pi 1.3.0 可逆宿主补丁、渲染与补丁回归测试及重启说明。
 - 架构整理（渲染输出、补丁产物与备份格式不变）：

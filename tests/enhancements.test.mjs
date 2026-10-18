@@ -9,14 +9,12 @@ const jiti=createJiti(import.meta.url,{alias:{'@earendil-works/pi-coding-agent':
 const config=await jiti.import(root+'/config.ts');const hl=await jiti.import(root+'/src/rendering/highlight.ts');
 if(process.argv.includes('--failure')){config.highlighting.theme='sydney-theme-does-not-exist';assert.deepEqual(await hl.highlight('const x = 1;','ts'),['const x = 1;']);assert.equal(hl.highlightStats.initializations,1);console.log('PASS initialization failure -> plain text');process.exit(0);}
 const {default:entry}=await jiti.import(root+'/index.ts');
-if(process.argv.includes('--startup')){const on=process.argv.includes('--on');config.features.diff=on;config.features.codeblock=on;entry({on(){},registerToolRenderer(){},registerTool(){},registerCommand(){},registerShortcut(){},registerMarkdownTransformer(){}});console.log(JSON.stringify({on,loadAndRegisterMs:performance.now()-start,shikiInitializations:hl.highlightStats.initializations}));process.exit(0);}
-initTheme('dark');const cb=await jiti.import(root+'/src/rendering/codeblock.ts');const df=await jiti.import(root+'/src/rendering/diff/index.ts');const {default:writeSnapshot}=await jiti.import(root+'/src/tools/write-snapshot.ts');
+if(process.argv.includes('--startup')){const on=process.argv.includes('--on');config.features.diff=on;entry({on(){},registerToolRenderer(){},registerTool(){},registerCommand(){},registerShortcut(){},registerMarkdownTransformer(){}});console.log(JSON.stringify({on,loadAndRegisterMs:performance.now()-start,shikiInitializations:hl.highlightStats.initializations}));process.exit(0);}
+initTheme('dark');const df=await jiti.import(root+'/src/rendering/diff/index.ts');const {default:writeSnapshot}=await jiti.import(root+'/src/tools/write-snapshot.ts');
 assert.equal(hl.highlightStats.initializations,0);
-assert.equal(cb.isClosed('```ts\nlet x = 1;'),false);assert.equal(cb.isClosed('```ts\nx\n```'),true);
-cb.renderBlock('long '.repeat(1000),'ts',80,theme,false);assert.equal(hl.highlightStats.initializations,0,'streaming open fences must not initialize');
 const first=performance.now();await hl.highlight('const x: number = 1;','ts');console.log('firstHighlightMs',+(performance.now()-first).toFixed(2));
 for(const [lang,code] of [['ts','const value = 1;'],['python','def x():\n    return 1'],['powershell','Get-Process'],['json','{"hello":1}'],[undefined,'plain'],['ahk','MsgBox "Hello"'],['unsupported-language','raw'],['ts','const x = "'+'中'.repeat(500)+'";']]){
- await hl.highlight(code,lang);const lines=cb.renderBlock(code,lang,80,theme,true);assert.ok(lines.every(l=>visibleWidth(l)<=80));assert.ok(!lines.join('\n').includes('```'));
+ const lines=await hl.highlight(code,lang);assert.equal(lines.map(l=>l.replace(/\x1b\[[0-?]*[ -/]*[@-~]/g,'')).join('\n'),code);
 }
 const strip=s=>s.replace(/\x1b\[[0-?]*[ -/]*[@-~]/g,'');
 for(const [oldText,newText,filename] of [['const n=1;','const n=2;','a.ts'],['a\nb\nc\nd\ne','A\nb\nc\nd\nE','a.py'],['','新文件\n第二行','new.txt'],['a\n'.repeat(300),'b\n'.repeat(300),'large.ts'],['你好 Sydney','你好 世界','a.ts'],['old','new','a.unsupported']]){
@@ -100,6 +98,6 @@ await hl.settleHighlights();assert.equal(notices,1,'same component subscribes on
 const temp=fs.mkdtempSync(path.join(os.tmpdir(),'sydney-write-diff-'));
 try{let tool;writeSnapshot({registerTool:t=>tool=t});const ctx={cwd:temp};let r=await tool.execute('one',{path:'new.ts',content:'const n=1;'},undefined,undefined,ctx);assert.ok(r.details.sydneyNewFile);assert.ok(r.details.sydneyDiffPatch);r=await tool.execute('two',{path:'new.ts',content:'const n=2;'},undefined,undefined,ctx);assert.ok(!r.details.sydneyNewFile);assert.equal(fs.readFileSync(path.join(temp,'new.ts'),'utf8'),'const n=2;');}finally{fs.rmSync(temp,{recursive:true,force:true});}
 await hl.settleHighlights();
-assert.equal(hl.highlightStats.initializations,1);console.log('PASS codeblock cases, open stream, diff cases, no backgrounds, write delegation and shared single initialization');
+assert.equal(hl.highlightStats.initializations,1);console.log('PASS highlight languages and fallbacks, diff cases, no backgrounds, write delegation and shared single initialization');
 console.log('activeResources',process.getActiveResourcesInfo());
 process.exit(0);

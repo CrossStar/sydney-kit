@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
-import { resolveHostRoot } from '../src/host/paths.mjs';
+import { resolveHostRoot } from '../../../src/host/paths.mjs';
 import { PI_HOST_VERSION } from '../src/host/version.mjs';
 
 export { PI_HOST_VERSION };

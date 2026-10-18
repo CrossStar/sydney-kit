@@ -9,8 +9,8 @@ const root=projectRoot;
 const jiti=createJiti(import.meta.url,{alias:{'@earendil-works/pi-coding-agent':hostPath('pi-coding-agent/dist/index.js'),'@earendil-works/pi-tui':hostPath('pi-tui/dist/index.js')}});
 const {default:entry}=await jiti.import(root+'/index.ts');
 const {features}=await jiti.import(root+'/config.ts');
-features.compactionCard=false;
-features.userMessage=false;features.appearance=false;features.diff=false;features.codeblock=false;features.pasteImage=false;features.ternImagePatch=false;
+
+features.userMessage=false;features.appearance=false;features.diff=false;features.pasteImage=false;
 const {initTheme}=await hostImport('pi-coding-agent/dist/index.js');initTheme('dark');
 const theme={fg:(_,s)=>s};
 let resolver;
