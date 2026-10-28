@@ -1,0 +1,6 @@
+{
+  "src/agent-runner.ts": "d80cab5fee8707cd5406ae47dca2a35268302347bd661ab5e6d9978b1cf4c366",
+  "src/agent-manager.ts": "51530f12c61f547790c85f8ea157b3552e9d6e3f818338ef3b3a89ede75118c9",
+  "src/index.ts": "a844b84464c5990071b69ec553c13e02452cf111578bc1e3e332c952e91bb0a8",
+  "src/workflow/host.ts": "8310f1d45740c80e30087cd45ee7620f27b4ab33db6d43be4c2f276c5f43c816"
+}

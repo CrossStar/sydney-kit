@@ -1,0 +1,7 @@
+{
+  "version": "2.7.1",
+  "files": {
+    "src/extension.ts": "43e7680b92bdbeb9fa81d3aa94839b003b173e0de4081ce6ed648f5dfb96600f",
+    "src/core/registry.ts": "1dcdc7b7fa7a81faa1231ba1792b65e4ec4812f6209657dd33020091d607519c"
+  }
+}

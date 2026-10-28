@@ -184,4 +184,4 @@ npm run package
 
 ## SSH 远程工作区
 
-默认启用 `features.ssh`。使用 `/remote ssh user@host` 连接、`/remote cd /srv/project` 切换远端目录、`/remote disconnect` 返回本地；`features.diff` 控制写入差异。仅四个标准工具及 user_bash 路由，后台任务和代理不会自动远程执行。不要同时安装上游扩展。认证、主机密钥与依赖说明见 [SSH 使用指南](docs/SSH.md)。已通过 `raspi` 的真实连接、远端命令、文件读取和断开验证；远端写入及网络断连恢复尚未实机验证。
+默认启用 `features.ssh`。使用 `/remote ssh user@host` 连接、`/remote cd /srv/project` 切换远端目录、`/remote disconnect` 返回本地；`features.diff` 控制写入差异。四个标准工具及 user_bash 自动路由；`bg_run` 和 Agent/工作流子代理可通过配套适配补丁接入远端。不要同时安装上游扩展。认证、主机密钥与依赖说明见 [SSH 使用指南](docs/SSH.md)。已通过 `raspi` 的真实连接、远端命令、文件读取和断开验证。后台任务与 Agent 的远端适配需要安装配套补丁并重新加载 Pi，步骤和范围见 [SSH 使用指南](docs/SSH.md)。

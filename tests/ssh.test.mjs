@@ -33,13 +33,36 @@ try {
  features.diff=false;await executeSnapshotWrite(temp,'2',{path:file,content:'again'},undefined,undefined,{},backend);assert.equal(reads,1);features.diff=true;
  result=await executeSnapshotWrite(temp,'3',{path:file,content:'local change'},undefined,undefined,{});assert.match(result.details.sydneyDiffPatch,/-local/);assert.equal(remote,'again');
  const {default:install}=await jiti.import(projectRoot+'/src/ssh/index.ts');const tools=[],hooks={};
- install({registerTool:t=>tools.push(t),registerCommand(){},on:(n,h)=>{hooks[n]=h;},appendEntry(){}});
+ const {createEventBus}=await hostImport('pi-coding-agent/dist/core/event-bus.js');
+ const {routeStateForOwner}=await jiti.import(projectRoot+'/src/ssh/owner.ts');
+ const parentEvents=createEventBus(), childEvents=createEventBus();
+ const parentRoute=routeStateForOwner(parentEvents);
+ parentRoute.resume={command:'ssh parent.invalid',cwd:'/parent',routeRemoteTools:true};
+ let claimed=false;
+ parentEvents.on('discovery',()=>{claimed=true;});
+ parentEvents.emit('discovery',{});
+ assert.equal(claimed,true,'host listeners claim synchronously before emit returns');
+ assert.equal(routeStateForOwner(parentEvents),parentRoute);
+ assert.equal(routeStateForOwner(childEvents).resume,undefined);
+ const activeProviders=new Map();
+ const childOn=childEvents.on;
+ childEvents.on=(name,handler)=>{activeProviders.set(name,(activeProviders.get(name)??0)+1);const release=childOn(name,handler);let done=false;return ()=>{if(!done){done=true;activeProviders.set(name,activeProviders.get(name)-1);release();}};};
+ install({events:childEvents,registerTool:t=>tools.push(t),registerCommand(){},on:(n,h)=>{hooks[n]=h;},appendEntry(){}});
  assert.deepEqual(tools.map(t=>t.name),['read','write','edit','bash','remote']);
  const ctx={cwd:temp,isProjectTrusted:()=>false,sessionManager:{getBranch:()=>[]},ui:{setStatus(){},addAutocompleteProvider(){},notify(){},theme:{fg:(_,s)=>s}}};
  await hooks.session_start({reason:'startup'},ctx);
+ for (const reason of ['new','switch']) {
+   for(const name of ['sydney-kit:bg-execution:v1','sydney-kit:ssh-child:v1']) assert.equal(activeProviders.get(name),1);
+   await hooks.session_shutdown({reason});
+   for(const name of ['sydney-kit:bg-execution:v1','sydney-kit:ssh-child:v1']) assert.equal(activeProviders.get(name),0);
+   await hooks.session_start({reason},ctx);
+   await hooks.session_start({reason},ctx);
+   for(const name of ['sydney-kit:bg-execution:v1','sydney-kit:ssh-child:v1']) assert.equal(activeProviders.get(name),1);
+ }
  await tools.find(t=>t.name==='remote').execute('4',{action:'disconnect'},undefined,undefined,ctx);
  assert.equal(await hooks.user_bash({command:'pwd'},ctx),undefined);
  await hooks.session_shutdown({reason:'exit'});await hooks.session_shutdown({reason:'exit'});
+ assert.equal(parentRoute.resume.cwd,'/parent','child lifecycle must not clear parent resume route');
  const {parseSshCommand}=await jiti.import(projectRoot+'/vendor/pi-ssh-remote/src/ssh/config.ts');
  const parsed=parseSshCommand('ssh test@example.invalid -p 2222');assert.equal(parsed.host,'example.invalid');assert.equal(parsed.port,2222);assert.equal(parsed.username,'test');
  await tools.find(t=>t.name==='write').execute('5',{path:file,content:'disconnected local'},undefined,undefined,ctx);assert.equal(fs.readFileSync(file,'utf8'),'disconnected local');assert.equal(remote,'again');

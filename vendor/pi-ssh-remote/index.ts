@@ -1,3 +1,7 @@
+import { SSH_CHILD_EVENT } from "../../src/ssh/child-binding";
+import { pinnedChildTools } from "../../src/ssh/child-tools";
+import { BG_PROVIDER_CHANNEL, remoteBackgroundChild } from "../../src/ssh/background";
+import { routeStateForOwner } from "../../src/ssh/owner";
 import { remoteFileTarget } from "../../src/ssh/path";
 import { executeSnapshotWrite } from "../../src/ssh/snapshot";
 /**
@@ -917,6 +921,19 @@ async function askSecret(ctx: any, label: string, placeholder: string): Promise<
 }
 
 export default function sshRemoteExtension(pi: ExtensionAPI) {
+  // The event bus survives reloads but is distinct for each SDK child session.
+  // Shadow only resume state; password and key-passphrase maps remain shared.
+  const ownerRoute = routeStateForOwner(pi.events);
+  const sharedCredentials = credentialCache;
+  initializeOwner(pi, ownerRoute, sharedCredentials);
+}
+
+function initializeOwner(pi: ExtensionAPI, ownerRoute: ReturnType<typeof routeStateForOwner>, sharedCredentials: CredentialCache) {
+  const credentialCache: CredentialCache = {
+    ...sharedCredentials,
+    get resume() { return ownerRoute.resume; },
+    set resume(value) { ownerRoute.resume = value; },
+  };
   migrateLegacyServerMemories();
   const auth = createSshAuthenticator(credentialCache);
 
@@ -1132,6 +1149,36 @@ export default function sshRemoteExtension(pi: ExtensionAPI) {
       closeRoute();
       throw new Error(`SSH hop ${connectingHop.label}: ${(error as Error).message}`);
     }
+  };
+
+  pi.on("tool_call", (event) => {
+    if (!routeRemoteTools) return;
+    if (event.toolName === 'bg_delegate' || event.toolName === 'bg_run_pi_attested') return { block: true, reason: 'Remote separate-process agents are unsupported; local execution is forbidden.' };
+    if (event.toolName === 'Agent' || event.toolName === 'SubagentWorkflow') {
+      const probe = { available: false };
+      pi.events.emit('sydney-kit:ssh-child-hook:v1', probe);
+      if (!probe.available) return { block: true, reason: 'Install integrations/subagents/install.mjs and reload Pi before remote Agent/SubagentWorkflow.' };
+      return;
+    }
+    if (event.toolName !== 'bg_run') return;
+    const probe = { available: false };
+    pi.events.emit('sydney-kit:bg-hook:v1', probe);
+    if (!probe.available) return { block: true, reason: 'Install integrations/background/install.mjs and reload Pi before remote bg_run.' };
+  });
+
+  const backgroundProvider = (request: any) => {
+    if (!routeRemoteTools) return;
+    if (!remote) { request.error = new Error('SSH route unavailable; local fallback forbidden'); return; }
+    if (request.provider) { request.error = new Error('Multiple background execution providers'); return; }
+    const { client: _client, ...target } = remote;
+    let snapshot: any;
+    try { snapshot = structuredClone(target); } catch (error) { request.error = error; return; }
+    request.provider = {
+      spawn(command: string, isAgent: boolean) {
+        if (isAgent) throw new Error('Remote bg_run requires isAgent:false; remote telemetry is unsupported');
+        return remoteBackgroundChild(() => connectRoute(snapshot), snapshot.cwd, command);
+      },
+    };
   };
 
   const establish = async (parsed: ParsedSsh, cwd: string, ctx?: any): Promise<RemoteState> => {
@@ -1373,9 +1420,9 @@ export default function sshRemoteExtension(pi: ExtensionAPI) {
   const isTextMimeType = (mime: string): boolean =>
     mime.startsWith("text/") || /\/(?:json|ld\+json|xml|javascript|x-sh|x-shellscript|x-empty)$/.test(mime);
 
-  const fileBackend = async (raw: string) => {
-    if (!remote) throw new Error("SSH remote is not connected");
-    const client = remote.client, cwd = remote.cwd;
+  const fileBackend = async (raw: string, selected: RemoteState | null = remote) => {
+    if (!selected) throw new Error("SSH remote is not connected");
+    const client = selected.client, cwd = selected.cwd;
     const home = /^@?~(?:\/|$)/.test(raw)
       ? (await execRemote(client, 'printf "%s" "$HOME"')).toString() : undefined;
     const target = remoteFileTarget(raw, cwd, home);
@@ -1392,6 +1439,49 @@ export default function sshRemoteExtension(pi: ExtensionAPI) {
       mkdir: async () => { await execRemote(client, `mkdir -p -- ${quote(target.directory)}`); },
     };
     return { client, target, read, write };
+  };
+
+  const childProvider = (request: any) => {
+    if (!routeRemoteTools) return;
+    const selected = remote;
+    // A claimed failing binding prevents a disconnected route becoming local.
+    let target: Omit<RemoteState, 'client'> | undefined;
+    let captureError: unknown;
+    try { target = selected ? structuredClone((({ client, ...route }) => route)(selected)) : undefined; }
+    catch (error) { captureError = error; }
+    request.claim({
+      metadata: Object.freeze({ cwd: target?.cwd ?? '/', platform: 'linux', routeId: target?.command ?? 'unavailable' }),
+      async prepare({ toolNames }: { toolNames: readonly string[] }) {
+        if (captureError) throw captureError;
+        if (!target) throw new Error('SSH child route unavailable; local fallback forbidden');
+        const client = await connectRoute(target);
+        const state = { ...target, client };
+        try {
+          const tools = await pinnedChildTools(toolNames, state.cwd, {
+            file: (path) => fileBackend(path, state),
+            exec: async (command, signal, timeout) => {
+              const seconds = parseRemoteTimeout(timeout ?? DEFAULT_REMOTE_TIMEOUT_SECONDS);
+              const stream = await openAbortableExec(client, `cd -- ${quote(state.cwd)} && ${withRemoteTimeout(command, seconds)}`, signal);
+              const chunks: Buffer[] = [];
+              let bytes = 0;
+              const collect = (data: Buffer) => { if (bytes < 50000) chunks.push(Buffer.from(data).subarray(0, 50000 - bytes)); bytes += data.length; };
+              const { code, timedOut } = await runExecChannel(stream, seconds, collect, collect, signal);
+              if (timedOut) throw new Error('Remote child command timed out');
+              return { output: Buffer.concat(chunks).toString(), exitCode: code ?? 1 };
+            },
+          });
+          return { tools, cleanup: () => { client.end(); } };
+        } catch (error) { client.end(); throw error; }
+      },
+    });
+  };
+  let releaseBackgroundProvider = () => {};
+  let releaseChildProvider = () => {};
+  const bindExecutionProviders = () => {
+    releaseBackgroundProvider();
+    releaseChildProvider();
+    releaseBackgroundProvider = pi.events.on(BG_PROVIDER_CHANNEL, backgroundProvider);
+    releaseChildProvider = pi.events.on(SSH_CHILD_EVENT, childProvider);
   };
 
   const executeRemoteRead = async (id: string, params: any, signal: AbortSignal | undefined, update: any) => {
@@ -1857,6 +1947,7 @@ export default function sshRemoteExtension(pi: ExtensionAPI) {
 
   pi.on("turn_start", () => { turnOutputBytes = 0; });
   pi.on("session_start", async (event, ctx) => {
+    bindExecutionProviders();
     const settings = SettingsManager.create(ctx.cwd, getAgentDir(), {
       projectTrusted: ctx.isProjectTrusted(),
     });
@@ -1894,6 +1985,8 @@ export default function sshRemoteExtension(pi: ExtensionAPI) {
     if (inherited && remote) persistSessionRemoteState();
   });
   pi.on("session_shutdown", async (event) => {
+    releaseBackgroundProvider();
+    releaseChildProvider();
     sessionReady = false;
     const previous = remote;
     const preserveConnection = event.reason === "reload" || event.reason === "new" || event.reason === "fork";
