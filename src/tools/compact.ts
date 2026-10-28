@@ -13,7 +13,7 @@ import { summary, textOutput } from './utils';
 export default function registerCompact(pi: ExtensionAPI) {
   const names = new ResultNames();
   for (const event of ['session_start', 'session_switch', 'session_tree', 'session_shutdown'] as const) pi.on(event, () => names.clear());
-  pi.registerToolRenderer((name, _next) => ({
+  pi.registerToolRenderer((name, next) => name === 'remote' ? next() : ({
     renderShell: 'self',
     renderCall(args, theme, context) {
       const state = context.state;

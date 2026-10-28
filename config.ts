@@ -1,5 +1,5 @@
 export const footerConfig = { warningPercent: 80, errorPercent: 90, shortContextWidth: 65, barWidthThreshold: 85, barCells: 10, indent: 2, icons: { model: '\uf2db', effort: '\uf0e7', context: '\uf1c0', folder: '\uf07c', branch: '\ue0a0' } };
-export const features = { footer: true, compact: true, userMessage: true, appearance: true, diff: true, pasteImage: true };
+export const features = { ssh: true, footer: true, compact: true, userMessage: true, appearance: true, diff: true, pasteImage: true };
 export const highlighting = { theme: 'github-dark-dimmed', preload: ['typescript','tsx','javascript','json','python','markdown','bash','powershell','yaml'], aliases: {ts:'typescript',js:'javascript',py:'python',md:'markdown',ps1:'powershell',pwsh:'powershell',sh:'bash',shell:'bash',yml:'yaml'} as Record<string,string>, maxChars: 200000, maxLineChars: 2000, cacheEntries: 64 };
 export const diffs = { sideBySide: false, previewLineChars: 300, parsedCacheEntries: 16, sideBySideMinWidth: 72, contextLines: 4, maxSnapshotBytes: 2_000_000, wordCompareLimit: 10000 };
 export const appearance = { boxedEditor: true, borderColor: 'borderMuted' as const, statusLabels: { working: 'Working…', thinking: 'Thinking…', responding: 'Responding…', tools: 'Running tools…' }, frameIntervalMs: 90, maxHighlightChars: 80000 };

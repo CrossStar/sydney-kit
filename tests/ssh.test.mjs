@@ -1,0 +1,48 @@
+import {projectRoot,hostPath,hostImport} from './helpers/paths.mjs';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+const temp=fs.mkdtempSync(path.join(os.tmpdir(),'sydney-ssh-'));
+process.env.PI_CODING_AGENT_DIR=path.join(temp,'agent');
+const {createJiti}=await hostImport('pi-coding-agent/dist/core/extensions/jiti-loader.js');
+const jiti=createJiti(import.meta.url,{alias:{'typebox':hostPath('../typebox/build/index.mjs'),'@earendil-works/pi-ai':hostPath('pi-ai/dist/index.js'),'@earendil-works/pi-coding-agent':hostPath('pi-coding-agent/dist/index.js'),'@earendil-works/pi-tui':hostPath('pi-tui/dist/index.js')}});
+try {
+ const config=await jiti.import(projectRoot+'/config.ts'); const {remoteFileTarget}=await jiti.import(projectRoot+'/src/ssh/path.ts');
+ for (const [raw,expected] of [['/srv/file','/srv/file'],['/outside/work/a.png','/outside/work/a.png'],['../other/file','/srv/other/file'],['./file','/srv/work/file'],['~/file','/home/remote/file'],['~','/home/remote'],['@/srv/file','/srv/file']]) {
+   const mapping=remoteFileTarget(raw,'/srv/work','/home/remote');
+   assert.equal(mapping.map(path.win32.resolve('D:\\workspace',raw)),expected);
+   assert.equal(mapping.directory,path.posix.dirname(expected));
+   assert.ok(Object.isFrozen(mapping));
+ }
+ assert.throws(()=>remoteFileTarget('C:\\outside\\file','/srv/work'),/POSIX/);
+ const {features}=config;
+ const {executeSnapshotWrite}=await jiti.import(projectRoot+'/src/ssh/snapshot.ts');
+ const file=path.join(temp,'same.txt');fs.writeFileSync(file,'local');
+ let remote='remote',reads=0,writes=0;
+ const backend={operations:{mkdir:async()=>{},writeFile:async(_p,c)=>{writes++;remote=c;}},readBefore:async()=>{reads++;return Buffer.from(remote);}};
+ let result=await executeSnapshotWrite(temp,'1',{path:file,content:'changed'},undefined,undefined,{},backend);
+ assert.match(result.details.sydneyDiffPatch,/-remote/);assert.equal(fs.readFileSync(file,'utf8'),'local');assert.equal(writes,1);
+ const missing={operations:backend.operations,readBefore:async()=>{throw Object.assign(new Error('missing'),{code:2});}};
+ const created=await executeSnapshotWrite(temp,'new',{path:file,content:'new'},undefined,undefined,{},missing);assert.equal(created.details.sydneyNewFile,true);
+ const maximum=config.diffs.maxSnapshotBytes;config.diffs.maxSnapshotBytes=2;
+ const large=await executeSnapshotWrite(temp,'large',{path:file,content:'large'},undefined,undefined,{},backend);assert.equal(large.details,undefined);config.diffs.maxSnapshotBytes=maximum;
+ let attempts=0;
+ await assert.rejects(executeSnapshotWrite(temp,'fail',{path:file,content:'x'},undefined,undefined,{}, {readBefore:async()=>Buffer.from('old'),operations:{mkdir:async()=>{},writeFile:async()=>{attempts++;throw new Error('connection lost');}}}),/connection lost/);assert.equal(attempts,1);
+ assert.equal(fs.readFileSync(file,'utf8'),'local');
+ features.diff=false;await executeSnapshotWrite(temp,'2',{path:file,content:'again'},undefined,undefined,{},backend);assert.equal(reads,1);features.diff=true;
+ result=await executeSnapshotWrite(temp,'3',{path:file,content:'local change'},undefined,undefined,{});assert.match(result.details.sydneyDiffPatch,/-local/);assert.equal(remote,'again');
+ const {default:install}=await jiti.import(projectRoot+'/src/ssh/index.ts');const tools=[],hooks={};
+ install({registerTool:t=>tools.push(t),registerCommand(){},on:(n,h)=>{hooks[n]=h;},appendEntry(){}});
+ assert.deepEqual(tools.map(t=>t.name),['read','write','edit','bash','remote']);
+ const ctx={cwd:temp,isProjectTrusted:()=>false,sessionManager:{getBranch:()=>[]},ui:{setStatus(){},addAutocompleteProvider(){},notify(){},theme:{fg:(_,s)=>s}}};
+ await hooks.session_start({reason:'startup'},ctx);
+ await tools.find(t=>t.name==='remote').execute('4',{action:'disconnect'},undefined,undefined,ctx);
+ assert.equal(await hooks.user_bash({command:'pwd'},ctx),undefined);
+ await hooks.session_shutdown({reason:'exit'});await hooks.session_shutdown({reason:'exit'});
+ const {parseSshCommand}=await jiti.import(projectRoot+'/vendor/pi-ssh-remote/src/ssh/config.ts');
+ const parsed=parseSshCommand('ssh test@example.invalid -p 2222');assert.equal(parsed.host,'example.invalid');assert.equal(parsed.port,2222);assert.equal(parsed.username,'test');
+ await tools.find(t=>t.name==='write').execute('5',{path:file,content:'disconnected local'},undefined,undefined,ctx);assert.equal(fs.readFileSync(file,'utf8'),'disconnected local');assert.equal(remote,'again');
+ const {quote,shellWords}=await jiti.import(projectRoot+'/vendor/pi-ssh-remote/src/shell.ts');assert.deepEqual(shellWords("ssh 'user name'"),['ssh','user name']);assert.ok(quote("a'b").includes("'"));
+ console.log('PASS SSH registration, lifecycle, disconnect and isolated snapshot backends');
+} finally {fs.rmSync(temp,{recursive:true,force:true});}

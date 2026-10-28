@@ -5,7 +5,7 @@ const {initTheme}=await hostImport('pi-coding-agent/dist/index.js');
 const {theme}=await hostImport('pi-coding-agent/dist/modes/interactive/theme/theme.js');
 const {visibleWidth}=await hostImport('pi-tui/dist/index.js');
 const start=performance.now(),root=projectRoot;
-const jiti=createJiti(import.meta.url,{alias:{'@earendil-works/pi-coding-agent':hostPath('pi-coding-agent/dist/index.js'),'@earendil-works/pi-tui':hostPath('pi-tui/dist/index.js')}});
+const jiti=createJiti(import.meta.url,{alias:{'typebox':hostPath('../typebox/build/index.mjs'),'@earendil-works/pi-ai':hostPath('pi-ai/dist/index.js'),'@earendil-works/pi-coding-agent':hostPath('pi-coding-agent/dist/index.js'),'@earendil-works/pi-tui':hostPath('pi-tui/dist/index.js')}});
 const config=await jiti.import(root+'/config.ts');const hl=await jiti.import(root+'/src/rendering/highlight.ts');
 if(process.argv.includes('--failure')){config.highlighting.theme='sydney-theme-does-not-exist';assert.deepEqual(await hl.highlight('const x = 1;','ts'),['const x = 1;']);assert.equal(hl.highlightStats.initializations,1);console.log('PASS initialization failure -> plain text');process.exit(0);}
 const {default:entry}=await jiti.import(root+'/index.ts');

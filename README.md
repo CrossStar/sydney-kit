@@ -8,6 +8,7 @@
 
 | 功能 | 使用体验 |
 | --- | --- |
+| SSH 远程工作区 | 通过 `/remote` 连接服务器，read / write / edit / bash 和 `!` 命令在远端执行，保留文件差异预览。 |
 | 紧凑工具输出 | 用状态图标、工具名和摘要展示调用结果，展开后查看完整输出。 |
 | 文件差异预览 | edit / write 显示行号和单词级改动，默认上下排列，也可切换双栏。 |
 | 输入框与运行状态 | 圆角边框、`❯` 提示符，以及跟随实际事件变化的工作状态。 |
@@ -114,6 +115,7 @@ Git 安装通过 `package.json` 中声明的 `index.ts` 加载；手动安装则
 
 ```ts
 export const features = {
+  ssh: true,            // SSH 连接和远程工具路由
   footer: true,          // 状态栏
   compact: true,         // 紧凑工具输出
   userMessage: true,     // 用户消息分隔线
@@ -157,6 +159,7 @@ export const features = {
 | `src/tools` | 紧凑工具输出：`catalog.ts` 记录工具名，`presenters/` 按工具类别生成摘要，`status` / `layout` / `body` 负责表头与正文 | 新工具类别新增一个 presenter，并登记到 `presenters/index.ts` |
 | `src/rendering` | Shiki 高亮、`diff/`（行模型与上下 / 双栏视图） | 视图只消费 `diff/model.ts` 的行模型 |
 | `src/clipboard` | 剪贴板进程、图片附件、占位删除 | 占位格式集中在 `image-token.ts` |
+| `src/ssh` | SSH 注册入口及按执行后端捕获的写入快照 | SSH 实现及许可证位于 `vendor/pi-ssh-remote` |
 | `src/host` | 定位 Pi 安装目录，供测试加载宿主 SDK | 非默认安装设置 `SYDNEY_KIT_PI_ROOT` |
 | `archive/host-patches` | 已归档的宿主补丁、代码块渲染器及其测试和文档 | 不被入口加载，`npm test` 不运行 |
 
@@ -178,3 +181,7 @@ npm run package
 - [已归档的宿主补丁](archive/host-patches/README.md)
 
 使用其他会替换输入框、工具渲染器或状态栏的扩展时，可能需要关闭重叠功能。终端图片是否正常显示，还取决于终端支持的图片协议和 Pi 的对应设置。
+
+## SSH 远程工作区
+
+默认启用 `features.ssh`。使用 `/remote ssh user@host` 连接、`/remote cd /srv/project` 切换远端目录、`/remote disconnect` 返回本地；`features.diff` 控制写入差异。仅四个标准工具及 user_bash 路由，后台任务和代理不会自动远程执行。不要同时安装上游扩展。认证、主机密钥与依赖说明见 [SSH 使用指南](docs/SSH.md)。已通过 `raspi` 的真实连接、远端命令、文件读取和断开验证；远端写入及网络断连恢复尚未实机验证。

@@ -6,11 +6,11 @@ import path from 'node:path';
 const {createJiti}=await hostImport('pi-coding-agent/dist/core/extensions/jiti-loader.js');
 const {visibleWidth}=await hostImport('pi-tui/dist/index.js');
 const root=projectRoot;
-const jiti=createJiti(import.meta.url,{alias:{'@earendil-works/pi-coding-agent':hostPath('pi-coding-agent/dist/index.js'),'@earendil-works/pi-tui':hostPath('pi-tui/dist/index.js')}});
+const jiti=createJiti(import.meta.url,{alias:{'typebox':hostPath('../typebox/build/index.mjs'),'@earendil-works/pi-ai':hostPath('pi-ai/dist/index.js'),'@earendil-works/pi-coding-agent':hostPath('pi-coding-agent/dist/index.js'),'@earendil-works/pi-tui':hostPath('pi-tui/dist/index.js')}});
 const {default:entry}=await jiti.import(root+'/index.ts');
 const {features}=await jiti.import(root+'/config.ts');
 
-features.userMessage=false;features.appearance=false;features.diff=false;features.pasteImage=false;
+features.ssh=false;features.userMessage=false;features.appearance=false;features.diff=false;features.pasteImage=false;
 const {initTheme}=await hostImport('pi-coding-agent/dist/index.js');initTheme('dark');
 const theme={fg:(_,s)=>s};
 let resolver;

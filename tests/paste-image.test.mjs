@@ -2,7 +2,7 @@ import {projectRoot,hostRoot,hostPath,hostImport} from './helpers/paths.mjs';imp
 import assert from 'node:assert/strict';import fs from 'node:fs/promises';import os from 'node:os';import path from 'node:path';
 const {createJiti}=await hostImport('pi-coding-agent/dist/core/extensions/jiti-loader.js');
 const root=projectRoot;
-const jiti=createJiti(import.meta.url,{alias:{'@earendil-works/pi-coding-agent':hostPath('pi-coding-agent/dist/index.js'),'@earendil-works/pi-tui':hostPath('pi-tui/dist/index.js')}});
+const jiti=createJiti(import.meta.url,{alias:{'typebox':hostPath('../typebox/build/index.mjs'),'@earendil-works/pi-ai':hostPath('pi-ai/dist/index.js'),'@earendil-works/pi-coding-agent':hostPath('pi-coding-agent/dist/index.js'),'@earendil-works/pi-tui':hostPath('pi-tui/dist/index.js')}});
 const mod=await jiti.import(root+'/src/clipboard/paste-image.ts');const {pasteImage:config,features}=await jiti.import(root+'/config.ts');
 const temp=await fs.mkdtemp(path.join(os.tmpdir(),'sydney-paste-test-'));config.directory=path.join(temp,'clipboard');
 try{

@@ -2,9 +2,14 @@
   "name": "sydney-kit",
   "version": "0.1.0",
   "description": "Compact tools, code highlighting, diffs and image paste for Pi Coding Agent",
-  "repository": { "type": "git", "url": "https://github.com/CrossStar/sydney-kit.git" },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/CrossStar/sydney-kit.git"
+  },
   "homepage": "https://github.com/CrossStar/sydney-kit#readme",
-  "bugs": { "url": "https://github.com/CrossStar/sydney-kit/issues" },
+  "bugs": {
+    "url": "https://github.com/CrossStar/sydney-kit/issues"
+  },
   "private": true,
   "type": "module",
   "scripts": {
@@ -22,11 +27,15 @@
   },
   "peerDependencies": {
     "@earendil-works/pi-coding-agent": "*",
-    "@earendil-works/pi-tui": "*"
+    "@earendil-works/pi-tui": "*",
+    "@earendil-works/pi-ai": "*",
+    "typebox": "*"
   },
   "dependencies": {
     "@shikijs/cli": "4.5.0",
     "diff": "9.0.0",
-    "shiki": "4.5.0"
+    "shiki": "4.5.0",
+    "ssh2": "^1.17.0",
+    "ssh-config": "^5.0.3"
   }
 }
