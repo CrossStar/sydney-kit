@@ -6,6 +6,8 @@
 
 ## 功能
 
+可选的 [自动显示公式图片](docs/MATH-HOST.md) 使用隔离的 Pi 1.5.0 宿主，将助手正文中的顶层 `$$` 公式原位渲染为图片，不修改全局安装或会话记录。
+
 | 功能 | 使用体验 |
 | --- | --- |
 | SSH 远程工作区 | 通过 `/remote` 连接服务器，read / write / edit / bash 和 `!` 命令在远端执行，保留文件差异预览。 |
@@ -185,3 +187,23 @@ npm run package
 ## SSH 远程工作区
 
 默认启用 `features.ssh`。使用 `/remote ssh user@host` 连接、`/remote cd /srv/project` 切换远端目录、`/remote disconnect` 返回本地；`features.diff` 控制写入差异。四个标准工具及 user_bash 自动路由；`bg_run` 和 Agent/工作流子代理可通过配套适配补丁接入远端。不要同时安装上游扩展。认证、主机密钥与依赖说明见 [SSH 使用指南](docs/SSH.md)。已通过 `raspi` 的真实连接、远端命令、文件读取和断开验证。后台任务与 Agent 的远端适配需要安装配套补丁并重新加载 Pi，步骤和范围见 [SSH 使用指南](docs/SSH.md)。
+
+## LaTeX 公式
+
+默认启用 `features.latex`。通过 `scripts/pi-tern` 启动时，助手回答中闭合的顶层 `$$...$$` 或 `\[...\]` 公式块会自动渲染为图片。模块提供 `/latex-status`、`/latex-clear-cache` 和 `/latex-zoom` 显示管理命令。普通 `pi` 命令不包含这一显示层补丁。MathJax 和 sharp 在本地生成透明 PNG，终端需要支持图片显示。
+
+公式使用当前 Pi 主题解析后的 `text` 颜色；无法取得该颜色时，浅色主题回退为黑色，深色主题回退为白色。缓存键包含颜色、表达式、显示模式和栅格宽度。自动公式图片在主题使界面失效刷新后会重新生成。基础栅格宽度为 60 列，显示大小可用 `/latex-zoom` 调整，最终取决于 Pi 和终端。
+
+上游来源见 [pi-latex attribution](src/latex/NOTICE.md)。
+
+公式 PNG 使用 2 倍像素密度，默认显示尺寸保持不变。在带补丁的 Pi 中使用 `/latex-zoom 1.5` 或 `/latex-zoom 2` 放大自动公式图片，`/latex-zoom reset` 恢复；无参数可查看当前倍率。支持 0.5–3 倍，作用于当前会话的自动公式。倍率切换复用 PNG，窗格宽度仍限制最终大小；较长公式可能需要加宽窗格才能明显放大。设置在重启后恢复为 1 倍。
+
+## Tern / WSL 启动入口
+
+在 Tern 的 Linux/WSL shell 中运行 `sh /path/to/sydney-kit/scripts/pi-tern`，即可通过几何尺寸适配器直接启动 Pi 并加载该目录的 sydney-kit。入口保留当前工作目录，所有参数原样传给 Pi；例如 `sh /path/to/sydney-kit/scripts/pi-tern --no-extensions` 只加载显式指定的本扩展。需要 Linux Python 3、Node.js，以及在 Linux 中安装的项目依赖（`npm ci`）；Windows 的 sharp 原生模块不能直接供 WSL 使用。入口在项目 `.pi/math-host` 下创建隔离的 Pi 1.5.0 显示层补丁副本，不修改全局 Pi；版本或源码不兼容时会报错。详见 [自动公式渲染](docs/MATH-HOST.md)。
+
+该入口复用原有 `zellij-tern.py` 的 TSP 查询与 PTY 转发逻辑，不启动 Zellij。它将 Tern 报告的字符格像素尺寸转换为 `CSI 14 t` / `CSI 16 t` 响应，并在窗口调整时更新 PTY 尺寸。直接在 Tern 中运行时启用 TSP 包装；在 Zellij 内会自动跳过外层 TSP 查询，直接启动带公式补丁的 Pi，使用 Zellij 的窗格尺寸。若 Zellij 内图片尺寸不正确，请从 Tern 外层通过 `zellij-tern` 启动 Zellij，以校正外层尺寸。直接模式无法取得初始 TSP 尺寸时会明确报错。公式渲染器自己的字号/缩放设置仍然独立于终端几何适配。
+
+协议回归测试：`PYTHONDONTWRITEBYTECODE=1 python3 tests/tern_geometry_test.py`。
+
+公式中的中文建议使用 `\text{中文}`。MathJax SVG 的中文依赖运行 sharp 的 Linux 字体库，与终端字体独立。WSL 缺少中文字体时，可运行 `sh scripts/setup-wsl-fonts`：它将本机 Windows 的微软雅黑链接到当前用户字体目录并更新字体缓存，不分发字体文件。也可以安装 Linux 的 `fonts-noto-cjk`。注册字体后需要完全退出并重新启动 Pi；若仍看到旧图片，运行 `/latex-clear-cache` 后重新生成。

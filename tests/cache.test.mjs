@@ -7,6 +7,8 @@ const {visibleWidth}=await hostImport('pi-tui/dist/index.js');
 const jiti=createJiti(import.meta.url,{alias:{'@earendil-works/pi-coding-agent':hostPath('pi-coding-agent/dist/index.js'),'@earendil-works/pi-tui':hostPath('pi-tui/dist/index.js')}});
 const {default:install}=await jiti.import(projectRoot+'/src/tools/compact.ts');
 initTheme('dark');let resolver;install({on(){},registerToolRenderer:f=>resolver=f});
+const imageRenderer = { image: true };
+assert.equal(resolver('latex', () => imageRenderer), imageRenderer, 'latex delegates to host image rendering');
 let calls=0;const measured={get colors(){return theme.colors},fg:(...args)=>{calls++;return theme.fg(...args)}};
 const r=resolver('read',()=>undefined),args={path:'test.ts'},ctx={state:{},args,cwd:'F:/Workspace',expanded:true,isError:false,isPartial:false,durationMs:10};
 let c=r.renderCall(args,measured,ctx);

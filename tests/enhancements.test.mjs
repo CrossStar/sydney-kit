@@ -9,7 +9,7 @@ const jiti=createJiti(import.meta.url,{alias:{'typebox':hostPath('../typebox/bui
 const config=await jiti.import(root+'/config.ts');const hl=await jiti.import(root+'/src/rendering/highlight.ts');
 if(process.argv.includes('--failure')){config.highlighting.theme='sydney-theme-does-not-exist';assert.deepEqual(await hl.highlight('const x = 1;','ts'),['const x = 1;']);assert.equal(hl.highlightStats.initializations,1);console.log('PASS initialization failure -> plain text');process.exit(0);}
 const {default:entry}=await jiti.import(root+'/index.ts');
-if(process.argv.includes('--startup')){const on=process.argv.includes('--on');config.features.diff=on;entry({on(){},registerToolRenderer(){},registerTool(){},registerCommand(){},registerShortcut(){},registerMarkdownTransformer(){}});console.log(JSON.stringify({on,loadAndRegisterMs:performance.now()-start,shikiInitializations:hl.highlightStats.initializations}));process.exit(0);}
+if(process.argv.includes('--startup')){const on=process.argv.includes('--on');config.features.diff=on;await entry({on(){},registerToolRenderer(){},registerTool(){},registerCommand(){},registerShortcut(){},registerMarkdownTransformer(){}});console.log(JSON.stringify({on,loadAndRegisterMs:performance.now()-start,shikiInitializations:hl.highlightStats.initializations}));process.exit(0);}
 initTheme('dark');const df=await jiti.import(root+'/src/rendering/diff/index.ts');const {default:writeSnapshot}=await jiti.import(root+'/src/tools/write-snapshot.ts');
 assert.equal(hl.highlightStats.initializations,0);
 const first=performance.now();await hl.highlight('const x: number = 1;','ts');console.log('firstHighlightMs',+(performance.now()-first).toFixed(2));

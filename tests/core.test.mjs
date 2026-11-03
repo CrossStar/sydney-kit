@@ -10,15 +10,15 @@ const jiti=createJiti(import.meta.url,{alias:{'typebox':hostPath('../typebox/bui
 const {default:entry}=await jiti.import(root+'/index.ts');
 const {features}=await jiti.import(root+'/config.ts');
 
-features.ssh=false;features.userMessage=false;features.appearance=false;features.diff=false;features.pasteImage=false;
+features.latex=false;features.ssh=false;features.userMessage=false;features.appearance=false;features.diff=false;features.pasteImage=false;
 const {initTheme}=await hostImport('pi-coding-agent/dist/index.js');initTheme('dark');
 const theme={fg:(_,s)=>s};
 let resolver;
 features.footer=false;features.compact=false;
-let baseEvents=0;entry({on(){baseEvents++}});
+let baseEvents=0;await entry({on(){baseEvents++}});
 for(const footer of [false,true])for(const compact of [false,true]){
  features.footer=footer;features.compact=compact;let events=0,commands=0,renders=0;
- entry({on(){events++},registerCommand(){commands++},registerToolRenderer(r){resolver=r;renders++}});
+ await entry({on(){events++},registerCommand(){commands++},registerToolRenderer(r){resolver=r;renders++}});
  assert.equal(commands,footer?1:0);assert.equal(renders,compact?1:0);assert.equal(events>baseEvents,footer||compact);
 }
 features.footer=true;features.compact=true;
