@@ -30,7 +30,13 @@ export default function registerUserMessage(pi: ExtensionAPI) {
     const bottomRule = messageRules.bottom.repeat(width);
     const top = current?.ui.theme.fg('borderMuted', topRule) ?? topRule;
     const bottom = current?.ui.theme.fg('borderMuted', bottomRule) ?? bottomRule;
-    // Blank lines end list/quote/table blocks before the standalone rules.
-    return `${top}\n\n${text}${closeOpenFence(text)}\n\n${bottom}`;
+    const body = text + closeOpenFence(text);
+    // Ordinary prompts can share a paragraph with the rules, using hard line
+    // breaks. Structured Markdown needs block boundaries to avoid swallowing
+    // the footer into a list, quote, table, heading, or code block.
+    const hasBlocks = /^(?: {0,3}(?:#{1,6}(?:\s|$)|>|[-+*]\s|\d+[.)]\s|`{3,}|~{3,}|(?:[-*_][ \t]*){3,}$|[=-]+[ \t]*$)| {4}|\t)/m.test(text)
+      || text.includes('|') || /^ {0,3}</m.test(text);
+    if (!hasBlocks) return `${top}  \n${text.trimEnd()}  \n${bottom}`;
+    return `${top}\n\n${body}\n\n${bottom}`;
   });
 }

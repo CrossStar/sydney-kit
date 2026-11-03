@@ -24,11 +24,17 @@ for(const text of samples) for(const pad of [0,1,3]) {
   assert.equal(top[0],' '.repeat(pad)+'▔'.repeat(width-2*pad)+' '.repeat(pad),context);
   assert.equal(bottom[0],' '.repeat(pad)+'▁'.repeat(width-2*pad)+' '.repeat(pad),context);
   const transformed=transform(text,{messageType:'user',availableWidth:width-2*pad});
-  assert.ok(transformed.includes('\n\n'+text),context);
+  assert.ok(transformed.includes(text.trimEnd()),context);
+  if (text === '第一行\n第二行' || text === 'FormulaScratchPad.ahk 隐藏托盘图标') {
+    const first = rendered.findIndex(l => l.includes('▔'));
+    const last = rendered.findIndex(l => l.includes('▁'));
+    assert.ok(rendered[first+1].trim(), 'no blank row below top rule');
+    assert.ok(rendered[last-1].trim(), 'no blank row above bottom rule');
+  }
   assert.equal(component.text,text,'stored prompt is unchanged');
  }
 }
 hooks.session_start({},{ui:{theme:{fg:(_c,s)=>s}}});
-assert.equal(transform('message test',{messageType:'user',availableWidth:80}),'▔'.repeat(80)+'\n\nmessage test\n\n'+'▁'.repeat(80));
+assert.equal(transform('message test',{messageType:'user',availableWidth:80}),'▔'.repeat(80)+'  \nmessage test  \n'+'▁'.repeat(80));
 assert.equal(transform('assistant unchanged',{messageType:'assistant',availableWidth:80}),'assistant unchanged');
 console.log('PASS standalone aligned rules across lists, quotes, tables, open/closed fences, padding and repeated resize; stored prompts unchanged');
