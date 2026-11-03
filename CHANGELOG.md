@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- 修复用户历史消息分割线被列表、引用或表格吞入后缩进、折行的问题；分割线使用独立 Markdown 块，并在显示层闭合未完成的代码围栏。原始消息保持不变。
+
+- 移除内置 LaTeX 渲染、公式专用启动入口和宿主补丁，以及对应依赖与测试。公式显示改由用户单独安装的 Fadouse/pi-math 提供；删除 `features.latex` 配置。
+
 - 剪贴板图片粘贴支持 macOS（Pi 自带原生模块）、Linux（wl-paste / xclip）和 WSL，不再仅限 Windows；支持文件管理器复制的图片文件。BMP/TIFF 改用 SDK 的 `convertToPng` 转换，删除 `image-to-png.ps1`。
 - 通过 SSH 粘贴本地剪贴板图片：本地运行 `npm run clipboard-bridge`，配合 `RemoteForward /tmp/sydney-kit-%r.sock 127.0.0.1:7395`。新增配置 `pasteImage.bridgePort` / `bridgeSocket` / `bridgeTimeoutMs`。
 - 图片粘贴测试改用纯 JS 生成的样本，可在非 Windows 平台运行；删除 `verify-image-fixtures.ps1`。

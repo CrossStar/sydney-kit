@@ -1,4 +1,3 @@
-import latex from './src/latex';
 import ssh from './src/ssh';
 import type { ExtensionAPI } from '@earendil-works/pi-coding-agent';
 import { features } from './config';
@@ -14,7 +13,6 @@ import compact from './src/tools/compact';
 export default async function(pi: ExtensionAPI) {
   const editor = new EditorPipeline();
   theme(pi);
-  if (features.latex) await latex(pi);
   if (features.footer) footer(pi);
   if (features.compact) compact(pi);
   if (features.userMessage) userMessage(pi);

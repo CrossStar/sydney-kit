@@ -7,7 +7,7 @@ const temp=await fs.mkdtemp(path.join(os.tmpdir(),'sydney-reader-test-'));
 const saved=[];const save=async(bytes,ext)=>{const p=path.join(temp,`clip-${saved.length}${ext}`);await fs.writeFile(p,bytes);saved.push(p);return p;};
 // A fake clipboard tool table: command -> (args) -> Buffer | null (empty/failed) ; missing command -> undefined (ENOENT).
 const fake=table=>async(cmd,args)=>{const tool=table[cmd];if(!tool)return undefined;return tool(args);};
-const linux=(env,table)=>r.readUnixClipboard(save,temp,undefined,{...env},'linux',fake(table),async()=>undefined);
+const linux=(env,table)=>r.readUnixClipboard(save,temp,undefined,{...env},'linux',fake(table),async()=>undefined,async()=>undefined);
 try{
  assert.equal(r.sniffImage(png(2,2)),'.png');assert.equal(r.sniffImage(Buffer.from('II*\0xxxx')),'.tiff');assert.equal(r.sniffImage(Buffer.from('hello')),undefined);
  assert.equal(r.preferredImageType(['TARGETS','image/bmp','image/png;q=1','text/plain']),'image/png;q=1');assert.equal(r.preferredImageType(['text/plain','image/svg+xml']),undefined);
@@ -21,6 +21,7 @@ try{
  // Wayland tool missing -> falls back to xclip (XWayland).
  assert.deepEqual(await linux({WAYLAND_DISPLAY:'w',DISPLAY:':0'},xclip),['/pics/one.png','/pics/two.webp']);
  await assert.rejects(linux({DISPLAY:':0'},{}),e=>e instanceof r.ClipboardUnavailable&&/xclip/.test(e.message));
+ assert.deepEqual(await r.readUnixClipboard(save,temp,undefined,{DISPLAY:':0'},'linux',fake({}),async()=>undefined,async()=>['/native/image.png']),['/native/image.png'],'native clipboard fallback remains available when tools are missing');
  await assert.rejects(linux({SSH_CONNECTION:'1 2 3 4'},{}),e=>e instanceof r.ClipboardUnavailable&&/RemoteForward/.test(e.message));
  assert.equal(r.isSsh({SSH_TTY:'/dev/pts/0'}),true);assert.equal(r.isSsh({}),false);assert.equal(r.isWsl({WSL_DISTRO_NAME:'Ubuntu'}),true);
  // WSL: WSLg has nothing, Windows clipboard has a screenshot.

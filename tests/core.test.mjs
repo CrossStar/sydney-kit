@@ -10,7 +10,7 @@ const jiti=createJiti(import.meta.url,{alias:{'typebox':hostPath('../typebox/bui
 const {default:entry}=await jiti.import(root+'/index.ts');
 const {features}=await jiti.import(root+'/config.ts');
 
-features.latex=false;features.ssh=false;features.userMessage=false;features.appearance=false;features.diff=false;features.pasteImage=false;
+features.ssh=false;features.userMessage=false;features.appearance=false;features.diff=false;features.pasteImage=false;
 const {initTheme}=await hostImport('pi-coding-agent/dist/index.js');initTheme('dark');
 const theme={fg:(_,s)=>s};
 let resolver;

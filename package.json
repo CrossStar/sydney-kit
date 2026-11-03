@@ -34,8 +34,6 @@
   "dependencies": {
     "@shikijs/cli": "4.5.0",
     "diff": "9.0.0",
-    "mathjax-full": "^3.2.1",
-    "sharp": "^0.35.5",
     "shiki": "4.5.0",
     "ssh-config": "^5.0.3",
     "ssh2": "^1.17.0"

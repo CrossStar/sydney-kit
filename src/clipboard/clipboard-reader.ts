@@ -102,7 +102,7 @@ async function viaWslPowerShell(directory: string, signal: AbortSignal | undefin
 }
 
 type Bridge = (socketPath: string, signal?: AbortSignal) => Promise<{ ext: string; bytes: Buffer }[] | undefined>;
-export async function readUnixClipboard(save: Save, directory: string, signal?: AbortSignal, env = process.env, platform = process.platform, runCommand: Run = run, bridge: Bridge = requestClipboardBridge): Promise<string[]> {
+export async function readUnixClipboard(save: Save, directory: string, signal?: AbortSignal, env = process.env, platform = process.platform, runCommand: Run = run, bridge: Bridge = requestClipboardBridge, nativeRead: typeof viaNative = viaNative): Promise<string[]> {
   // Over SSH the user's clipboard is on the client machine; a forwarded bridge socket reaches it.
   // Also tried without a display, which covers tmux sessions that outlived the SSH variables.
   if (isSsh(env) || (platform === 'linux' && !env.DISPLAY && !env.WAYLAND_DISPLAY)) {
@@ -115,7 +115,7 @@ export async function readUnixClipboard(save: Save, directory: string, signal?: 
     }
   }
   if (platform === 'darwin') {
-    const result = await viaNative(save);
+    const result = await nativeRead(save);
     if (result === undefined) throw new ClipboardUnavailable('无法加载 macOS 剪贴板组件');
     return result;
   }
@@ -125,7 +125,7 @@ export async function readUnixClipboard(save: Save, directory: string, signal?: 
   if (env.WAYLAND_DISPLAY || env.XDG_SESSION_TYPE === 'wayland' || wsl) result = await viaTool(save, signal, runWithEnv, 'wl-paste', ['--list-types'], type => ['--type', type, '--no-newline']);
   if (result === undefined && env.DISPLAY) result = await viaTool(save, signal, runWithEnv, 'xclip', ['-selection', 'clipboard', '-t', 'TARGETS', '-o'], type => ['-selection', 'clipboard', '-t', type, '-o']);
   if (!result?.length && wsl) result = (await viaWslPowerShell(directory, signal, runWithEnv)) ?? result;
-  if (result === undefined && env.DISPLAY) result = await viaNative(save);
+  if (result === undefined && env.DISPLAY) result = await nativeRead(save);
   if (result !== undefined) return result;
   if (isSsh(env)) throw new ClipboardUnavailable(`Pi 通过 SSH 运行在远端，未找到剪贴板桥接 ${bridgeSocketPath(env)}：请按 docs/PASTE-IMAGE.md 配置 RemoteForward`);
   throw new ClipboardUnavailable('未找到可用的剪贴板工具：Wayland 请安装 wl-clipboard，X11 请安装 xclip');
