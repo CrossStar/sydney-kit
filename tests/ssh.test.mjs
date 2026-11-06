@@ -49,6 +49,21 @@ try {
  childEvents.on=(name,handler)=>{activeProviders.set(name,(activeProviders.get(name)??0)+1);const release=childOn(name,handler);let done=false;return ()=>{if(!done){done=true;activeProviders.set(name,activeProviders.get(name)-1);release();}};};
  install({events:childEvents,registerTool:t=>tools.push(t),registerCommand(){},on:(n,h)=>{hooks[n]=h;},appendEntry(){}});
  assert.deepEqual(tools.map(t=>t.name),['read','write','edit','bash','remote']);
+ const {visibleWidth}=await hostImport('pi-tui/dist/index.js');
+ const {initTheme}=await hostImport('pi-coding-agent/dist/index.js');initTheme('dark');
+ const renderTheme={fg:(_,s)=>`\x1b[33m${s}\x1b[39m`};
+ for(const fullOutputPath of ['/tmp/pi-ssh-remote-output-qUt71Q/output.log','/tmp/训练日志/'.repeat(12)+'output.log']) {
+   const result={content:[],details:{action:'exec',output:Array.from({length:20},()=> '训练 output').join('\n'),displayLines:5,fullOutputPath,truncation:{truncated:true,outputLines:114,totalLines:142}}};
+   for(const expanded of [false,true]) {
+     const component=tools.find(t=>t.name==='remote').renderResult(result,{expanded},renderTheme);
+     for(const width of [20,40,93,95,120]) {
+       const lines=component.render(width);
+       assert.ok(lines.every(line=>visibleWidth(line)<=width),`remote result exceeds ${width} columns (expanded=${expanded})`);
+       assert.ok(lines.map(line=>line.replace(/\x1b\[[0-9;]*m/g,'').trimEnd()).join('').includes('output.log'),'full output filename remains visible');
+     }
+   }
+ }
+
  const ctx={cwd:temp,isProjectTrusted:()=>false,sessionManager:{getBranch:()=>[]},ui:{setStatus(){},addAutocompleteProvider(){},notify(){},theme:{fg:(_,s)=>s}}};
  await hooks.session_start({reason:'startup'},ctx);
  for (const reason of ['new','switch']) {

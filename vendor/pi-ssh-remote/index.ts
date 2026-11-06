@@ -729,7 +729,8 @@ function renderRemoteControlResult(result: any, expanded: boolean, theme: any): 
       const hint = skipped > 0
         ? [theme.fg("muted", `... (${skipped} earlier lines, ${keyHint("app.tools.expand", "to expand")})`)]
         : [];
-      return [...hint, ...shown, ...(warning ? [theme.fg("warning", `[${warning}]`)] : [])];
+      return [...hint, ...shown, ...(warning ? [theme.fg("warning", `[${warning}]`)] : [])]
+        .flatMap((line) => new Text(line, 0, 0).render(width));
     },
     invalidate() {},
   };
