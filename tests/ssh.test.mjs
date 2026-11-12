@@ -67,12 +67,12 @@ try {
  const ctx={cwd:temp,isProjectTrusted:()=>false,sessionManager:{getBranch:()=>[]},ui:{setStatus(){},addAutocompleteProvider(){},notify(){},theme:{fg:(_,s)=>s}}};
  await hooks.session_start({reason:'startup'},ctx);
  for (const reason of ['new','switch']) {
-   for(const name of ['sydney-kit:bg-execution:v1','sydney-kit:ssh-child:v1']) assert.equal(activeProviders.get(name),1);
+   for(const name of ['sydney-kit:bg-execution:v1','subagents:execution-backend:v1']) assert.equal(activeProviders.get(name),1);
    await hooks.session_shutdown({reason});
-   for(const name of ['sydney-kit:bg-execution:v1','sydney-kit:ssh-child:v1']) assert.equal(activeProviders.get(name),0);
+   for(const name of ['sydney-kit:bg-execution:v1','subagents:execution-backend:v1']) assert.equal(activeProviders.get(name),0);
    await hooks.session_start({reason},ctx);
    await hooks.session_start({reason},ctx);
-   for(const name of ['sydney-kit:bg-execution:v1','sydney-kit:ssh-child:v1']) assert.equal(activeProviders.get(name),1);
+   for(const name of ['sydney-kit:bg-execution:v1','subagents:execution-backend:v1']) assert.equal(activeProviders.get(name),1);
  }
  await tools.find(t=>t.name==='remote').execute('4',{action:'disconnect'},undefined,undefined,ctx);
  assert.equal(await hooks.user_bash({command:'pwd'},ctx),undefined);

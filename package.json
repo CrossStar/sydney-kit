@@ -1,6 +1,6 @@
 {
   "name": "sydney-kit",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Compact tools, code highlighting, diffs and image paste for Pi Coding Agent",
   "repository": {
     "type": "git",
@@ -19,7 +19,9 @@
   },
   "pi": {
     "extensions": [
-      "./index.ts"
+      "./entries/interface.ts",
+      "./entries/tool-view.ts",
+      "./entries/ssh-workspace.ts"
     ],
     "themes": [
       "./themes/tokyo-night.json"

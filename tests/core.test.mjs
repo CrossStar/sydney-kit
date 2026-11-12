@@ -5,6 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 const {createJiti}=await hostImport('pi-coding-agent/dist/core/extensions/jiti-loader.js');
 const {visibleWidth}=await hostImport('pi-tui/dist/index.js');
+const {createEventBus}=await hostImport('pi-coding-agent/dist/core/event-bus.js');
 const root=projectRoot;
 const jiti=createJiti(import.meta.url,{alias:{'typebox':hostPath('../typebox/build/index.mjs'),'@earendil-works/pi-ai':hostPath('pi-ai/dist/index.js'),'@earendil-works/pi-coding-agent':hostPath('pi-coding-agent/dist/index.js'),'@earendil-works/pi-tui':hostPath('pi-tui/dist/index.js')}});
 const {default:entry}=await jiti.import(root+'/index.ts');
@@ -15,10 +16,10 @@ const {initTheme}=await hostImport('pi-coding-agent/dist/index.js');initTheme('d
 const theme={fg:(_,s)=>s};
 let resolver;
 features.footer=false;features.compact=false;
-let baseEvents=0;await entry({on(){baseEvents++}});
+let baseEvents=0;await entry({events:createEventBus(),on(){baseEvents++}});
 for(const footer of [false,true])for(const compact of [false,true]){
  features.footer=footer;features.compact=compact;let events=0,commands=0,renders=0;
- await entry({on(){events++},registerCommand(){commands++},registerToolRenderer(r){resolver=r;renders++}});
+ await entry({events:createEventBus(),on(){events++},registerCommand(){commands++},registerToolRenderer(r){resolver=r;renders++}});
  assert.equal(commands,footer?1:0);assert.equal(renders,compact?1:0);assert.equal(events>baseEvents,footer||compact);
 }
 features.footer=true;features.compact=true;
@@ -39,12 +40,14 @@ for(const name of ['bash','read','edit','write','grep','unknown_mcp'])for(const 
 }
 const old=projectRoot+'/tests/fixtures/original-footer.ts';
 const fixture=fs.mkdtempSync(path.join(os.tmpdir(),'sydney-footer-'));
-fs.writeFileSync(fixture+'/original.ts',fs.readFileSync(fs.existsSync(old)?old:old+'.bak'));
+const fixtureSource=fs.readFileSync(fs.existsSync(old)?old:old+'.bak','utf8');
+// Preserve the historical rendering oracle, updating only the required model label.
+fs.writeFileSync(fixture+'/original.ts',fixtureSource.replace('ctx.model?.id ?? "no-model"','ctx.model ? `${ctx.model.provider}/${ctx.model.id}` : "no-model"'));
 let original;
 try { original=await jiti.import(fixture+'/original.ts'); } finally { fs.rmSync(fixture,{recursive:true,force:true}); }
 const migrated=await jiti.import(root+'/src/ui/footer.ts');
 for(const width of [1,20,64,65,80,85,120])for(const percent of [0,79,80,89,90,100]){
- const render=(install)=>{let hook,component;install({on:(n,f)=>{if(n==='session_start')hook=f},registerCommand(){},getThinkingLevel:()=> 'medium'});hook({}, {mode:'tui',model:{id:'model',reasoning:true},sessionManager:{getCwd:()=> 'F:\\Workspace'},getContextUsage:()=>({percent}),ui:{setFooter:f=>{component=f({requestRender(){}},theme,{onBranchChange:()=>()=>{},getGitBranch:()=> 'main',getExtensionStatuses:()=>new Map([['b','中文'],['a','ready']])})}}});return component.render(width)};
+ const render=(install)=>{let hook,component;install({on:(n,f)=>{if(n==='session_start')hook=f},registerCommand(){},getThinkingLevel:()=> 'medium'});hook({}, {mode:'tui',model:{provider:'test-provider',id:'model',reasoning:true},sessionManager:{getCwd:()=> 'F:\\Workspace'},getContextUsage:()=>({percent}),ui:{setFooter:f=>{component=f({requestRender(){}},theme,{onBranchChange:()=>()=>{},getGitBranch:()=> 'main',getExtensionStatuses:()=>new Map([['b','中文'],['a','ready']])})}}});return component.render(width)};
  assert.deepEqual(render(original.default),render(migrated.default));
 }
 const sdk=await hostImport('pi-coding-agent/dist/index.js');

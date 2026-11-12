@@ -1,24 +1,11 @@
-import ssh from './src/ssh';
 import type { ExtensionAPI } from '@earendil-works/pi-coding-agent';
-import { features } from './config';
-import theme from './src/ui/theme';
-import footer from './src/ui/footer';
-import appearance from './src/ui/appearance';
-import userMessage from './src/ui/user-message';
-import writeSnapshot from './src/tools/write-snapshot';
-import pasteImage from './src/clipboard/paste-image';
-import { imageBackspace } from './src/clipboard/image-editor';
-import registerEditor, { EditorPipeline } from './src/ui/editor';
-import compact from './src/tools/compact';
-export default async function(pi: ExtensionAPI) {
-  const editor = new EditorPipeline();
-  theme(pi);
-  if (features.footer) footer(pi);
-  if (features.compact) compact(pi);
-  if (features.userMessage) userMessage(pi);
-  if (features.appearance) editor.setBase(appearance(pi));
-  if (features.ssh) ssh(pi);
-  else if (features.diff) writeSnapshot(pi);
-  if (features.pasteImage) editor.decorate(imageBackspace(pasteImage(pi).isImageToken));
-  registerEditor(pi, editor);
+import registerInterface from './entries/interface';
+import toolView from './entries/tool-view';
+import sshWorkspace from './entries/ssh-workspace';
+
+/** Legacy combined entry. The package manifest loads the three entries instead. */
+export default async function sydneyKit(pi: ExtensionAPI) {
+  await registerInterface(pi);
+  toolView(pi);
+  sshWorkspace(pi);
 }

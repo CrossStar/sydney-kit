@@ -19,6 +19,10 @@
 | 图片粘贴 | 按 `Alt+V` 添加真实图片附件（Windows、macOS、Linux，以及通过 SSH 的远端会话），支持连续粘贴多张和整段删除图片占位。 |
 | 网页与后台任务摘要 | 为已有的搜索、抓取和后台任务工具提供易读摘要；后台工具名称保留 `bg` 标识。 |
 
+远端 Agent/SubagentWorkflow 需要 **CrossStar/pi-subagents v0.24.0**，通过 `subagents:execution-backend:v1` 原生接口运行；远端持久化后台任务需要 **CrossStar/pi-background-tasks v2.8.0** 和远端 Node.js 22+。两者均需单独安装，不由本插件自动安装。旧的源码补丁集成不再支持。安装与执行范围见 [原生子代理集成说明](integrations/subagents/README.md) 和 [后台持久化说明](integrations/background/PERSISTENT.md)。
+
+持久化演示见 [PERSISTENCE-DEMO](docs/PERSISTENCE-DEMO.md)。本版范围不包含主机 reboot 或服务 restart 恢复保证。历史 `tests/ssh-bg-live.mjs` 带维护者 Windows/raspi 硬编码，仅留作历史参考，不维护、不属于默认测试，也不作为本版通过依据。
+
 插件只为已有网页、后台任务和 Fusion 工具优化显示，不负责安装这些工具。
 
 插件不修改 Pi 安装目录中的任何文件。早期版本的代码块样式、上下文压缩卡片和 Tern 图片补丁需要修改 Pi 安装文件，已归档到 [archive/host-patches](archive/host-patches/README.md)，不再默认执行。
@@ -51,7 +55,7 @@ pi update git:github.com/CrossStar/sydney-kit
 
 ### 手动下载与安装
 
-从 [GitHub Releases](https://github.com/CrossStar/sydney-kit/releases/latest) 下载 `sydney-kit-0.1.0.zip`，或在 [仓库页面](https://github.com/CrossStar/sydney-kit) 选择 **Code → Download ZIP** 获取源码。
+从 [GitHub Releases](https://github.com/CrossStar/sydney-kit/releases/latest) 下载 `sydney-kit-0.2.0.zip`，或在 [仓库页面](https://github.com/CrossStar/sydney-kit) 选择 **Code → Download ZIP** 获取源码。
 
 也可以克隆仓库：
 
@@ -65,7 +69,8 @@ git clone https://github.com/CrossStar/sydney-kit.git
 
 ```text
 ~/.pi/agent/extensions/sydney-kit/
-├── index.ts
+├── entries/                   # interface / tool-view / ssh-workspace
+├── index.ts                   # 旧组合入口
 ├── config.ts
 ├── package.json
 ├── package-lock.json
@@ -99,7 +104,21 @@ npm ci --legacy-peer-deps
 /reload
 ```
 
-Git 安装通过 `package.json` 中声明的 `index.ts` 加载；手动安装则由扩展目录发现入口。
+Git 和手动目录安装均通过 `package.json` 默认加载三个入口（不再加载旧 `index.ts`）：
+
+| 入口 | 所属功能 |
+| --- | --- |
+| `entries/interface.ts` | 默认主题、状态栏、用户消息、EditorPipeline 与图片粘贴 |
+| `entries/tool-view.ts` | 工具渲染与本地 write 差异快照 |
+| `entries/ssh-workspace.ts` | SSH 连接、远端工具路由与远端写入快照 |
+
+通过 `pi config` 可以分别筛选入口；也可以在 settings.json 的 package 配置中设置 `extensions` 白名单，例如：
+
+```json
+{"packages": [{"source": "git:github.com/CrossStar/sydney-kit", "extensions": ["entries/tool-view.ts"]}]}
+```
+
+临时测试单入口可用 `pi -e ./entries/tool-view.ts`。旧 `index.ts` 仍可作为组合入口显式加载，但不要再单独安装旧副本。各入口保留 `features` 开关；未加载 SSH 入口时，即使 `features.ssh` 为 true，tool-view 仍使用本地快照。组合加载时 SSH 拥有写入工具，加载顺序不影响路由。
 
 ## 日常使用
 
@@ -153,7 +172,7 @@ export const features = {
 
 ## 项目开发
 
-根目录的 `index.ts` 只负责按开关注册和组装，`config.ts` 是统一配置入口。源码按职责划分：
+根目录的 `index.ts` 是兼容组合入口，`entries/` 提供三个独立入口，`entries/shared/` 通过共享事件总线协调注册并在关闭时清理；`config.ts` 是统一配置入口。源码按职责划分：
 
 | 目录 | 职责 | 扩展方式 |
 | --- | --- | --- |
@@ -186,7 +205,7 @@ npm run package
 
 ## SSH 远程工作区
 
-默认启用 `features.ssh`。使用 `/remote ssh user@host` 连接、`/remote cd /srv/project` 切换远端目录、`/remote disconnect` 返回本地；`features.diff` 控制写入差异。四个标准工具及 user_bash 自动路由；`bg_run` 和 Agent/工作流子代理可通过配套适配补丁接入远端。不要同时安装上游扩展。认证、主机密钥与依赖说明见 [SSH 使用指南](docs/SSH.md)。已通过 `raspi` 的真实连接、远端命令、文件读取和断开验证。后台任务与 Agent 的远端适配需要安装配套补丁并重新加载 Pi，步骤和范围见 [SSH 使用指南](docs/SSH.md)。
+默认启用 `features.ssh`。使用 `/remote ssh user@host` 连接、`/remote cd /srv/project` 切换远端目录、`/remote disconnect` 返回本地；`features.diff` 控制写入差异。四个标准工具及 user_bash 自动路由；`bg_run` 通过 pi-background-tasks 的原生执行后端接口接入远端，Agent/工作流子代理使用对应适配。不要同时安装上游扩展。认证、主机密钥与依赖说明见 [SSH 使用指南](docs/SSH.md)。已通过 `raspi` 的真实连接、远端命令、文件读取和断开验证。后台任务使用 pi-background-tasks 的原生接口，不再安装后台适配补丁；Agent/工作流适配范围见 [SSH 使用指南](docs/SSH.md)。
 
 ## 公式渲染迁移
 

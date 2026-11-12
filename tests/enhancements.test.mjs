@@ -1,5 +1,6 @@
 import {projectRoot,hostRoot,hostPath,hostImport} from './helpers/paths.mjs';
 import assert from 'node:assert/strict';import fs from 'node:fs';import os from 'node:os';import path from 'node:path';import {performance} from 'node:perf_hooks';
+const {createEventBus}=await hostImport('pi-coding-agent/dist/core/event-bus.js');
 const {createJiti}=await hostImport('pi-coding-agent/dist/core/extensions/jiti-loader.js');
 const {initTheme}=await hostImport('pi-coding-agent/dist/index.js');
 const {theme}=await hostImport('pi-coding-agent/dist/modes/interactive/theme/theme.js');
@@ -9,7 +10,7 @@ const jiti=createJiti(import.meta.url,{alias:{'typebox':hostPath('../typebox/bui
 const config=await jiti.import(root+'/config.ts');const hl=await jiti.import(root+'/src/rendering/highlight.ts');
 if(process.argv.includes('--failure')){config.highlighting.theme='sydney-theme-does-not-exist';assert.deepEqual(await hl.highlight('const x = 1;','ts'),['const x = 1;']);assert.equal(hl.highlightStats.initializations,1);console.log('PASS initialization failure -> plain text');process.exit(0);}
 const {default:entry}=await jiti.import(root+'/index.ts');
-if(process.argv.includes('--startup')){const on=process.argv.includes('--on');config.features.diff=on;await entry({on(){},registerToolRenderer(){},registerTool(){},registerCommand(){},registerShortcut(){},registerMarkdownTransformer(){}});console.log(JSON.stringify({on,loadAndRegisterMs:performance.now()-start,shikiInitializations:hl.highlightStats.initializations}));process.exit(0);}
+if(process.argv.includes('--startup')){const on=process.argv.includes('--on');config.features.diff=on;await entry({events:createEventBus(),on(){},registerToolRenderer(){},registerTool(){},registerCommand(){},registerShortcut(){},registerMarkdownTransformer(){}});console.log(JSON.stringify({on,loadAndRegisterMs:performance.now()-start,shikiInitializations:hl.highlightStats.initializations}));process.exit(0);}
 initTheme('dark');const df=await jiti.import(root+'/src/rendering/diff/index.ts');const {default:writeSnapshot}=await jiti.import(root+'/src/tools/write-snapshot.ts');
 assert.equal(hl.highlightStats.initializations,0);
 const first=performance.now();await hl.highlight('const x: number = 1;','ts');console.log('firstHighlightMs',+(performance.now()-first).toFixed(2));

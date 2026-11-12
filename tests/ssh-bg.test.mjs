@@ -7,7 +7,7 @@ import {EventEmitter} from 'node:events';
 import {PassThrough} from 'node:stream';
 const {createJiti}=await hostImport('pi-coding-agent/dist/core/extensions/jiti-loader.js');
 const jiti=createJiti(import.meta.url,{alias:{'typebox':hostPath('../typebox/build/index.mjs'),'@earendil-works/pi-ai':hostPath('pi-ai/dist/index.js'),'@earendil-works/pi-coding-agent':hostPath('pi-coding-agent/dist/index.js'),'@earendil-works/pi-tui':hostPath('pi-tui/dist/index.js')}});
-const root=process.env.SYDNEY_BG_ROOT || 'C:/Users/PC/.pi/agent/git/github.com/CrossStar/pi-background-tasks';
+const root=process.env.SYDNEY_BG_ROOT || path.join(os.homedir(),'.pi/agent/git/github.com/CrossStar/pi-background-tasks');
 const {BackgroundTaskRegistry}=await jiti.import(root+'/src/core/registry.ts');
 const temp=fs.mkdtempSync(path.join(os.tmpdir(),'sydney-bg-'));
 const children=[];let route='A',local=0;
@@ -25,5 +25,5 @@ try {
  await assert.rejects(registry.startTask(ctx,'agent',{isAgent:true}),/isAgent:false/);
  const lost=await registry.startTask(ctx,'lost',{isAgent:false});children.at(-1).child.emit('error',Error('Remote outcome unknown'));
  await registry.waitForEnd(lost,2000);assert.equal(lost.status,'failed');assert.match(lost.error,/unknown/);assert.equal(local,0);
- console.log('PASS patched registry admission pinning, logs, completion, kill, transport failure, no fallback');
+ console.log('PASS native registry admission pinning, logs, completion, kill, transport failure, no fallback');
 } finally {await Promise.all(registry.allTasks().map(t=>t.metadataWriteChain));fs.rmSync(temp,{recursive:true,force:true});}

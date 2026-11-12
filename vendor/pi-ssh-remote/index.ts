@@ -1,4 +1,5 @@
-import { SSH_CHILD_EVENT } from "../../src/ssh/child-binding";
+import { persistentBackground, persistentRouteId } from "../../src/ssh/persistent-background";
+import { EXECUTION_BACKEND_EVENT, type ExecutionBackendRequest } from "../../src/ssh/child-binding";
 import { pinnedChildTools } from "../../src/ssh/child-tools";
 import { BG_PROVIDER_CHANNEL, remoteBackgroundChild } from "../../src/ssh/background";
 import { routeStateForOwner } from "../../src/ssh/owner";
@@ -1153,28 +1154,35 @@ function initializeOwner(pi: ExtensionAPI, ownerRoute: ReturnType<typeof routeSt
   };
 
   pi.on("tool_call", (event) => {
-    if (!routeRemoteTools) return;
+    if (!routeRemoteTools && !restoringSessionState) return;
     if (event.toolName === 'bg_delegate' || event.toolName === 'bg_run_pi_attested') return { block: true, reason: 'Remote separate-process agents are unsupported; local execution is forbidden.' };
-    if (event.toolName === 'Agent' || event.toolName === 'SubagentWorkflow') {
-      const probe = { available: false };
-      pi.events.emit('sydney-kit:ssh-child-hook:v1', probe);
-      if (!probe.available) return { block: true, reason: 'Install integrations/subagents/install.mjs and reload Pi before remote Agent/SubagentWorkflow.' };
-      return;
-    }
     if (event.toolName !== 'bg_run') return;
     const probe = { available: false };
     pi.events.emit('sydney-kit:bg-hook:v1', probe);
-    if (!probe.available) return { block: true, reason: 'Install integrations/background/install.mjs and reload Pi before remote bg_run.' };
+    if (!probe.available) return { block: true, reason: 'Upgrade pi-background-tasks to a release with native execution provider and readiness hook support, load it and reload Pi before remote bg_run. See integrations/background/README.md.' };
   });
 
   const backgroundProvider = (request: any) => {
+    if (restoringSessionState) { request.error = new Error('SSH route restore pending; local fallback forbidden'); return; }
     if (!routeRemoteTools) return;
     if (!remote) { request.error = new Error('SSH route unavailable; local fallback forbidden'); return; }
     if (request.provider) { request.error = new Error('Multiple background execution providers'); return; }
     const { client: _client, ...target } = remote;
     let snapshot: any;
     try { snapshot = structuredClone(target); } catch (error) { request.error = error; return; }
+    const probe: any = { available: false, includePersistentRuntime: true };
+    pi.events.emit('sydney-kit:bg-hook:v1', probe);
+    if (probe.error !== undefined) {
+      request.error = probe.error;
+      return;
+    }
+    let persistent;
+    try { if (probe.runtimeBundle) persistent = persistentBackground(() => connectRoute(snapshot), probe.runtimeBundle); }
+    catch (error) { request.error = error; return; }
     request.provider = {
+      id: persistentRouteId(snapshot),
+      cwd: snapshot.cwd,
+      ...(persistent ? { persistent } : {}),
       spawn(command: string, isAgent: boolean) {
         if (isAgent) throw new Error('Remote bg_run requires isAgent:false; remote telemetry is unsupported');
         return remoteBackgroundChild(() => connectRoute(snapshot), snapshot.cwd, command);
@@ -1230,6 +1238,7 @@ function initializeOwner(pi: ExtensionAPI, ownerRoute: ReturnType<typeof routeSt
       lastCwd = next.cwd;
       saveEndpointConfig(parsed.command, { remoteCwd: next.cwd }, true);
       persistSessionRemoteState();
+      pi.events.emit('sydney-kit:bg-persistent-ready:v1', {});
       oldClient?.end();
       if (currentCtx) {
         status(currentCtx);
@@ -1266,6 +1275,7 @@ function initializeOwner(pi: ExtensionAPI, ownerRoute: ReturnType<typeof routeSt
     saveEndpointConfig(remote.command, { remoteCwd: resolved }, true);
     status(ctx);
     persistSessionRemoteState();
+    pi.events.emit('sydney-kit:bg-persistent-ready:v1', {});
     return resolved;
   };
 
@@ -1310,6 +1320,7 @@ function initializeOwner(pi: ExtensionAPI, ownerRoute: ReturnType<typeof routeSt
       saveEndpointConfig(command, { remoteCwd: next.cwd }, true);
       status(ctx);
       persistSessionRemoteState();
+      if (!restoringSessionState) pi.events.emit('sydney-kit:bg-persistent-ready:v1', {});
       if (next.unavailableCwd) {
         ctx.ui.notify(`SSH remote directory unavailable: ${next.unavailableCwd}; connected in default directory ${next.cwd}`, "warning");
       } else {
@@ -1442,22 +1453,31 @@ function initializeOwner(pi: ExtensionAPI, ownerRoute: ReturnType<typeof routeSt
     return { client, target, read, write };
   };
 
-  const childProvider = (request: any) => {
-    if (!routeRemoteTools) return;
-    const selected = remote;
-    // A claimed failing binding prevents a disconnected route becoming local.
-    let target: Omit<RemoteState, 'client'> | undefined;
-    let captureError: unknown;
-    try { target = selected ? structuredClone((({ client, ...route }) => route)(selected)) : undefined; }
-    catch (error) { captureError = error; }
+  const childProvider = (request: ExecutionBackendRequest) => {
+    if (!routeRemoteTools && !restoringSessionState) return;
     request.claim({
-      metadata: Object.freeze({ cwd: target?.cwd ?? '/', platform: 'linux', routeId: target?.command ?? 'unavailable' }),
-      async prepare({ toolNames }: { toolNames: readonly string[] }) {
-        if (captureError) throw captureError;
-        if (!target) throw new Error('SSH child route unavailable; local fallback forbidden');
-        const client = await connectRoute(target);
+      version: 1,
+      id: 'sydney-kit:ssh',
+      capture() {
+        if (restoringSessionState || !remote) return { ok: false, code: 'unavailable', message: 'SSH route unavailable or restoring; local fallback forbidden' };
+        const target = structuredClone((({ client, ...route }) => route)(remote));
+        return { ok: true, binding: {
+      version: 1, id: 'sydney-kit:ssh', cwd: target.cwd, platform: 'linux',
+      capabilities: Object.freeze({ worktree: false, cwdOverride: false, memory: false, nesting: false, extensions: false, skills: false, shellGates: false }),
+      async prepare(toolNames: readonly string[], signal?: AbortSignal) {
+        signal?.throwIfAborted();
+        const unsupported = toolNames.filter(name => !['read','write','edit','bash','grep','find','ls'].includes(name));
+        if (unsupported.length) throw new Error(`Unsupported SSH child tools: ${unsupported.join(', ')}`);
+        const connecting = connectRoute(target).then(client => {
+          if (signal?.aborted) { client.end(); signal.throwIfAborted(); }
+          return client;
+        });
+        const client = await untilAborted(connecting, signal);
+        let disposed = false;
+        const dispose = async () => { if (!disposed) { disposed = true; client.end(); } };
         const state = { ...target, client };
         try {
+          signal?.throwIfAborted();
           const tools = await pinnedChildTools(toolNames, state.cwd, {
             file: (path) => fileBackend(path, state),
             exec: async (command, signal, timeout) => {
@@ -1471,8 +1491,11 @@ function initializeOwner(pi: ExtensionAPI, ownerRoute: ReturnType<typeof routeSt
               return { output: Buffer.concat(chunks).toString(), exitCode: code ?? 1 };
             },
           });
-          return { tools, cleanup: () => { client.end(); } };
-        } catch (error) { client.end(); throw error; }
+          signal?.throwIfAborted();
+          return { tools, dispose };
+        } catch (error) { await dispose(); throw error; }
+      },
+        }};
       },
     });
   };
@@ -1482,7 +1505,7 @@ function initializeOwner(pi: ExtensionAPI, ownerRoute: ReturnType<typeof routeSt
     releaseBackgroundProvider();
     releaseChildProvider();
     releaseBackgroundProvider = pi.events.on(BG_PROVIDER_CHANNEL, backgroundProvider);
-    releaseChildProvider = pi.events.on(SSH_CHILD_EVENT, childProvider);
+    releaseChildProvider = pi.events.on(EXECUTION_BACKEND_EVENT, childProvider);
   };
 
   const executeRemoteRead = async (id: string, params: any, signal: AbortSignal | undefined, update: any) => {
@@ -1976,12 +1999,14 @@ function initializeOwner(pi: ExtensionAPI, ownerRoute: ReturnType<typeof routeSt
       return;
     }
     restoringSessionState = true;
+    if (target.connected && (target.routeRemoteTools ?? true)) routeRemoteTools = true;
     try {
       await restoreSessionRemoteState(target, ctx);
     } catch (error) {
       ctx.ui.notify(`SSH remote session restore failed: ${(error as Error).message.split("\n")[0]}`, "error");
     } finally {
       restoringSessionState = false;
+      if (remote && routeRemoteTools) pi.events.emit('sydney-kit:bg-persistent-ready:v1', {});
     }
     if (inherited && remote) persistSessionRemoteState();
   });

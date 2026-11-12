@@ -1,23 +1,21 @@
-// Transport independent v1 contract. Providers must capture the connection synchronously.
-export const SSH_CHILD_EVENT = "sydney-kit:ssh-child:v1";
-export interface ChildTool { name: string; [key: string]: unknown }
-export interface ChildBinding {
-  readonly metadata: Readonly<{ cwd: string; platform: string; routeId: string }>;
-  prepare(request: { toolNames: readonly string[] }): Promise<{
-    tools: ChildTool[];
-    cleanup(): void | Promise<void>;
-  }>;
+import type { ToolDefinition } from '@earendil-works/pi-coding-agent';
+/** Structural mirror of pi-subagents' process-local execution backend v1. */
+export const EXECUTION_BACKEND_EVENT = 'subagents:execution-backend:v1';
+export interface ExecutionBackendRequest {
+  readonly version: 1;
+  readonly cwd: string;
+  claim(provider: ExecutionBackendProvider): void;
 }
-export interface ChildBindingRequest { /** false means the synchronous claim window closed or the request is invalid. */ claim(binding: ChildBinding): boolean }
-/** Backends close over pinned operations, never consult the current global route. */
-export async function createChildTools(
-  toolNames: readonly string[],
-  factories: Readonly<Record<string, (() => ChildTool | Promise<ChildTool>) | undefined>>,
-): Promise<ChildTool[]> {
-  return Promise.all(toolNames.map(async name => {
-    if (!Object.hasOwn(factories, name) || !factories[name]) throw new Error(`Unsupported SSH child tool: ${name}`);
-    const tool = await factories[name]!();
-    if (tool.name !== name) throw new Error(`SSH tool name mismatch: ${name}`);
-    return tool;
-  }));
+export interface ExecutionBackendProvider {
+  readonly version: 1;
+  readonly id: string;
+  capture(cwd: string): { ok: true; binding: ExecutionBackendBinding } | { ok: false; code: 'unavailable' | 'incompatible'; message: string };
+}
+export interface ExecutionBackendBinding {
+  readonly version: 1;
+  readonly id: string;
+  readonly cwd: string;
+  readonly platform: string;
+  readonly capabilities?: Readonly<Partial<Record<'worktree' | 'cwdOverride' | 'memory' | 'nesting' | 'extensions' | 'skills' | 'shellGates', false>>>;
+  prepare(toolNames: readonly string[], signal?: AbortSignal): Promise<{ tools: readonly ToolDefinition[]; dispose(): Promise<void> }>;
 }

@@ -1,6 +1,13 @@
 # Changelog
 
-## Unreleased
+## 0.2.0
+
+- 默认拆分为 interface、tool-view、ssh-workspace 三个独立入口，保留旧组合入口供显式加载。
+- 远端子代理改用 CrossStar/pi-subagents v0.24.0 的原生 execution-backend 接口，移除旧源码补丁安装流程。
+- 对接 CrossStar/pi-background-tasks v2.8.0 原生后台接口，加入 SSH 运行时部署、持久化任务与重连恢复；保留旧原生提供方的连接期兼容路径。此版本不承诺主机 reboot 或服务 restart 后恢复。
+- 修复远端运行时、任务及凭据文件的私有权限与原子安装处理，补充 readiness 和持久化回归测试。
+- 新增持久化演示脚本与演示文档，以及集成测试入口。默认套件不包含历史 ssh-bg-live 手动脚本或真实远端破坏性恢复测试。
+
 
 - 修复用户历史消息分割线被列表、引用或表格吞入后缩进、折行的问题；分割线使用独立 Markdown 块，并在显示层闭合未完成的代码围栏。原始消息保持不变。
 

@@ -26,6 +26,12 @@
 
 - npm test：全部独立脚本，遇到失败停止。
 - node scripts/test.mjs paste：仅运行名称匹配的测试。
+- node scripts/test-integrations.mjs：跨项目自动化测试；逐个运行 kit 全部测试（失败后继续），再运行 subagents 的五个 backend 文件及 cross-extension-rpc，以及 background 的 execution-backend、persistent-runtime、remote-persistent、persistent/remote-bridge。不会调用旧 ssh-bg-live，也不代表真实 SSH 或真实模型端到端通过。
+- node scripts/test-integrations.mjs --check：只检查目录、测试文件和必要依赖，不安装依赖；--help 显示参数。
+- node scripts/test-integrations.mjs --full：kit 全部测试加两个依赖的完整 npm test。
+
+依赖默认是项目同级 pi-background-tasks、pi-subagents；可设置 SYDNEY_BG_ROOT 和 SUBAGENTS_ROOT 为其他路径（运行 kit 测试时也传入）。宿主 SDK 仍支持 SYDNEY_KIT_PI_ROOT。每步独立日志和 summary.json 保存在 dist/integration-tests/<timestamp>-<pid>/，JSON 记录 argv 命令、cwd、退出码和耗时；任一步失败最终返回非零。SIGINT/SIGTERM 会终止当前测试进程树并记录中断。真实 SSH 验证请另行在专用测试主机手动检查连接、后台完成通知、重连恢复及 subagent 工具路由，不要运行历史硬编码机器的脚本。
+
 - npm run package：生成 dist/sydney-kit-0.1.0.zip 和 manifest.json。
 
 测试不会启动新的 Pi 或模型会话，也不修改 Pi 安装目录；图片测试用 tests/helpers/image-fixtures.mjs 生成自己的样本。

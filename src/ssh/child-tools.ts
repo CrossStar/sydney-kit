@@ -1,6 +1,15 @@
 import { posix } from 'node:path';
 import { Type } from 'typebox';
-import { createChildTools } from './child-binding';
+/** Construct only the consumer's exact requested scope. */
+export async function createChildTools(toolNames: readonly string[], factories: Readonly<Record<string, (() => any) | undefined>>) {
+  if (new Set(toolNames).size !== toolNames.length) throw new Error('Duplicate SSH child tools');
+  return Promise.all(toolNames.map(async name => {
+    if (!Object.hasOwn(factories, name) || !factories[name]) throw new Error(`Unsupported SSH child tool: ${name}`);
+    const tool = await factories[name]!();
+    if (tool.name !== name) throw new Error(`SSH tool name mismatch: ${name}`);
+    return tool;
+  }));
+}
 import { createReadToolDefinition, createWriteToolDefinition, createEditToolDefinition, createBashToolDefinition } from '@earendil-works/pi-coding-agent';
 const q = (value: string) => `'${value.replace(/'/g, `'"'"'`)}'`;
 /** All callbacks are bound to one owned client; no callback consults active route state. */
@@ -28,10 +37,12 @@ export async function pinnedChildTools(toolNames: readonly string[], cwd: string
       const target=q(posix.resolve(cwd,args.path ?? '.'));
       const limit=Math.min(1000,Math.max(1,Math.floor(args.limit ?? 100)));
       let command: string;
-      if(name==='grep') command=`grep -rn ${args.ignoreCase?'-i':''} ${args.literal?'-F':'-E'} ${args.glob?`--include=${q(args.glob)}`:''} -- ${q(args.pattern??'')} ${target}`;
+      if(name==='grep') command=`grep -rn -C ${Math.max(0, Math.floor(args.context ?? 0))} ${args.ignoreCase?'-i':''} ${args.literal?'-F':'-E'} ${args.glob?`--include=${q(args.glob)}`:''} -- ${q(args.pattern??'')} ${target}`;
       else if(name==='find') command=`find ${target} -type f -name ${q(args.pattern??'*')}`;
       else command=`ls -la -- ${target}`;
-      const result=await backend.exec(`${command} | head -n ${limit} | head -c 50000`,signal,30);
+      // Capture status before truncation: head must never hide a search failure.
+      const result=await backend.exec(`out=$(mktemp) || exit; ${command} >"$out" 2>&1; status=$?; head -n ${limit} "$out" | head -c 50000; rm -f "$out"; exit "$status"`,signal,30);
+      if (result.exitCode !== 0 && !(name === 'grep' && result.exitCode === 1)) throw new Error(`Remote ${name} failed (${result.exitCode}): ${result.output}`);
       return {content:[{type:'text',text:result.output}],details:{remote:true}};
     },
   });

@@ -1,5 +1,6 @@
 import {projectRoot,hostRoot,hostPath,hostImport} from './helpers/paths.mjs';import {writeImageFixtures} from './helpers/image-fixtures.mjs';
 import assert from 'node:assert/strict';import fs from 'node:fs/promises';import os from 'node:os';import path from 'node:path';
+const {createEventBus}=await hostImport('pi-coding-agent/dist/core/event-bus.js');
 const {createJiti}=await hostImport('pi-coding-agent/dist/core/extensions/jiti-loader.js');
 const root=projectRoot;
 const jiti=createJiti(import.meta.url,{alias:{'typebox':hostPath('../typebox/build/index.mjs'),'@earendil-works/pi-ai':hostPath('pi-ai/dist/index.js'),'@earendil-works/pi-coding-agent':hostPath('pi-coding-agent/dist/index.js'),'@earendil-works/pi-tui':hostPath('pi-tui/dist/index.js')}});
@@ -45,7 +46,7 @@ try{
  await lateHandler(ctx);assert.equal(editor,' [图片 1]','placeholder appears before preparation resolves');
  release(prepared[0]);const completed=await lateEvents.input({text:editor,source:'interactive'},ctx);assert.ok(completed.text.includes('[图片 1 · 64×32]'));assert.equal(completed.images.length,1);lateEvents.session_shutdown();
  const {default:entry}=await jiti.import(root+'/index.ts');for(const key of Object.keys(features))features[key]=false;let registered=0;
- const pi={on(){},registerShortcut(){registered++}};entry(pi);assert.equal(registered,0);features.pasteImage=true;entry(pi);assert.equal(registered,1);
+ const makePi=()=>({events:createEventBus(),on(){},registerShortcut(){registered++}});await entry(makePi());assert.equal(registered,0);features.pasteImage=true;const pi=makePi();await entry(pi);assert.equal(registered,1);await entry(pi);assert.equal(registered,1,'same API installation is deduplicated');
  console.log('PASS actual PNG/JPEG/GIF/BMP/TIFF/WebP decode, 4000x1000 -> 2000x500; retention cleanup; cursor placeholders; multiple images; input image bytes; text/empty/error/model guards; feature off; only alt+v registered.');
 }finally{await fs.rm(temp,{recursive:true,force:true});}
 process.exit(0);

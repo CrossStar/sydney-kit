@@ -14,17 +14,16 @@ try {
  await hooks.session_start({reason:'startup'},ctx);await call({action:'connect',command:'ssh raspi'});
  const nativeClone=globalThis.structuredClone;
  let failedBinding;
- try {globalThis.structuredClone=()=>{throw Error('injected clone failure');};events.emit('sydney-kit:ssh-child:v1',{claim(value){assert.equal(failedBinding,undefined);failedBinding=value;}});} finally {globalThis.structuredClone=nativeClone;}
- assert.ok(failedBinding);await assert.rejects(failedBinding.prepare({toolNames:['read']}),/injected clone failure/);
+ try {events.emit('subagents:execution-backend:v1',{version:1,cwd:temp,claim(value){assert.equal(failedBinding,undefined);failedBinding=value;}});globalThis.structuredClone=()=>{throw Error('injected clone failure');};assert.throws(()=>failedBinding.capture(temp),/injected clone failure/);} finally {globalThis.structuredClone=nativeClone;}
+ assert.ok(failedBinding);
  await hooks.session_shutdown({reason:'new'});await hooks.session_start({reason:'new'},ctx);
- let claims=0;events.emit('sydney-kit:ssh-child:v1',{claim(){claims++;}});assert.equal(claims,1);
+ let claims=0;events.emit('subagents:execution-backend:v1',{version:1,cwd:temp,claim(){claims++;}});assert.equal(claims,1);
  const rebindProbe={};events.emit('sydney-kit:bg-execution:v1',rebindProbe);assert.ok(rebindProbe.provider);assert.equal(rebindProbe.error,undefined);
  const blocked=await hooks.tool_call({toolName:'bg_run'},ctx);assert.equal(blocked?.block,true);
  for(const toolName of ['Agent','SubagentWorkflow']) assert.equal((await hooks.tool_call({toolName},ctx))?.block,true);
- const releaseHook=events.on('sydney-kit:ssh-child-hook:v1',probe=>{probe.available=true;});
- assert.equal(await hooks.tool_call({toolName:'Agent'},ctx),undefined);releaseHook();
- let binding;events.emit('sydney-kit:ssh-child:v1',{claim(value){binding=value;}});assert.ok(binding);
- const prepared=await binding.prepare({toolNames:['read','bash','grep','find','ls','write','edit']});
+ let provider;events.emit('subagents:execution-backend:v1',{version:1,cwd:temp,claim(value){provider=value;}});assert.ok(provider);
+ const reply=provider.capture(temp);assert.equal(reply.ok,true);const binding=reply.binding;
+ const prepared=await binding.prepare(['read','bash','grep','find','ls','write','edit']);
  try {const read=await prepared.tools.find(t=>t.name==='read').execute('child',{path:'/etc/os-release'},undefined,undefined);assert.match(JSON.stringify(read),/Debian/);const bash=await prepared.tools.find(t=>t.name==='bash').execute('child',{command:'hostname',timeout:10},undefined,undefined);assert.match(JSON.stringify(bash),/sydney-raspi/);
  const invoke=async(name,args)=>prepared.tools.find(t=>t.name===name).execute('child',args,undefined,undefined);
  const directory='/tmp/sydney-child-'+process.pid+'-'+Date.now();
@@ -37,7 +36,7 @@ try {
  assert.match(JSON.stringify(await invoke('find',{path:directory,pattern:'*.txt'})),/probe.txt/);
  assert.match(JSON.stringify(await invoke('ls',{path:directory})),/probe.txt/);
  } finally {await invoke('bash',{command:`rm -rf -- '${directory}'`,timeout:10});}
- } finally {await prepared.cleanup();}
+ } finally {await prepared.dispose();}
  const task=await registry.startTask(ctx,"printf 'remote-output\\n'; hostname",{isAgent:false,notifyOnCompletion:false});await registry.waitForEnd(task,15000);console.log((await registry.getTaskLogs(task,4096,true)).text);assert.equal(task.status,'completed',task.error);assert.match((await registry.getTaskLogs(task,4096,true)).text,/remote-output/);
  const kill=await registry.startTask(ctx,'sleep 90',{isAgent:false,notifyOnCompletion:false});await registry.stopTask(kill,'user');assert.equal(kill.status,'killed',kill.error);
  const timeout=await registry.startTask(ctx,'sleep 90',{isAgent:false,timeoutSeconds:1,notifyOnCompletion:false});await registry.waitForEnd(timeout,15000);assert.equal(timeout.status,'failed');assert.match(timeout.error,/Timed out/);
