@@ -44,7 +44,7 @@ export default function (pi: ExtensionAPI) {
           const branch = footerData.getGitBranch();
           const path = theme.fg("accent", `${icons.folder} `) + theme.fg("dim", cwd)
             + (branch ? theme.fg("muted", `  ${icons.branch} ${clean(branch)}`) : "");
-          const model = theme.fg("accent", `${icons.model} ${clean(ctx.model?.id ?? "no-model")}`)
+          const model = theme.fg("accent", `${icons.model} ${clean(ctx.model ? `${ctx.model.provider}/${ctx.model.id}` : "no-model")}`)
             + (ctx.model?.reasoning ? theme.fg("muted", `  ${icons.effort} ${pi.getThinkingLevel()}`) : "");
 
           const modelInfo=ctx.model;
