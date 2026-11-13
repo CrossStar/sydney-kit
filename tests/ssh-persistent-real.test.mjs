@@ -33,6 +33,15 @@ const connect=async()=>{
 };
 let adapter;
 try {
+ const piRoot=path.join(root,'.pi');
+ fs.mkdirSync(piRoot,{mode:0o700});
+ fs.chmodSync(piRoot,0o777);
+ await assert.rejects(persistentBackground(connect,bundle).list(root), /bootstrap: SSH command exited with code 1; Bridge error: Unsafe runtime artifact:.*reason=permissions/);
+ fs.chmodSync(piRoot,0o700);
+ const runtimeRoot=path.join(piRoot,'background-tasks-runtime');
+ fs.symlinkSync(root,runtimeRoot);
+ await assert.rejects(persistentBackground(connect,bundle).list(root), /bootstrap: SSH command exited with code 1; Bridge error: Unsafe runtime artifact:.*actual=symbolic-link/);
+ fs.unlinkSync(runtimeRoot);
  const a=persistentBackground(connect,bundle), b=persistentBackground(connect,bundle);adapter=b;
  await Promise.all([a.list(root),b.list(root)]);
  await assert.rejects(a.start({id:'survives',ownerSession:'A',cwd:root,name:'survives',command:'printf x >> counter; printf hello; sleep 60',timeoutSeconds:120,maxOutputBytes:4096}),/simulated disconnect/);

@@ -88,15 +88,18 @@ export function persistentBackground(connect: () => Promise<any>, supplied: Runt
           const close = (code: unknown, signal: unknown) => {
             streamClosed = true;
             out += decoder.end();
-            if (signal || exitSignal) return finish(diagnostic(`SSH command terminated by signal ${sanitize(String(signal || exitSignal)).slice(0, 80)}`));
-            if ((typeof code === 'number' && code !== 0) || (typeof exitCode === 'number' && exitCode !== 0)) return finish(diagnostic(`SSH command exited with code ${typeof code === 'number' && code !== 0 ? code : exitCode}`));
-            if (code !== 0 && exitCode !== 0) return finish(diagnostic('SSH command closed without verified exit status; outcome unknown'));
-            if (!out.trim()) return finish(diagnostic('Empty JSON response'));
             let response: any;
-            try { response = JSON.parse(out); }
-            catch { return finish(diagnostic('Malformed or truncated JSON response')); }
+            try { response = JSON.parse(out); } catch { /* Status failures take precedence over malformed output. */ }
+            const message = response?.ok === false
+              ? (typeof response.error === 'string' ? response.error : response.error?.message)
+              : undefined;
+            const detail = typeof message === 'string' ? `; Bridge error: ${sanitize(message)}` : '';
+            if (signal || exitSignal) return finish(diagnostic(`SSH command terminated by signal ${sanitize(String(signal || exitSignal)).slice(0, 80)}${detail}`));
+            if ((typeof code === 'number' && code !== 0) || (typeof exitCode === 'number' && exitCode !== 0)) return finish(diagnostic(`SSH command exited with code ${typeof code === 'number' && code !== 0 ? code : exitCode}${detail}`));
+            if (code !== 0 && exitCode !== 0) return finish(diagnostic(`SSH command closed without verified exit status; outcome unknown${detail}`));
+            if (!out.trim()) return finish(diagnostic('Empty JSON response'));
+            if (response === undefined) return finish(diagnostic('Malformed or truncated JSON response'));
             if (response?.ok !== true) {
-              const message = typeof response?.error === 'string' ? response.error : response?.error?.message;
               return finish(diagnostic(typeof message === 'string' ? `Bridge error: ${sanitize(message)}` : 'Invalid bridge response envelope'));
             }
             finish(undefined, response.result);

@@ -56,6 +56,17 @@ await diagnosticCase(s=>{s.emit('data',Buffer.from('{"ok":true,"result":"secret"
 await diagnosticCase(s=>{s.stderr.emit('data',Buffer.from('warning'));s.emit('error',Error('secret'))},/bootstrap: SSH stream failed.*warning/);
 await diagnosticCase(s=>{s.stderr.emit('data',Buffer.alloc(3*1024*1024,120))},e=>e.message.includes('output limit') && e.message.length<8500);
 for(const error of ['ordinary failure',{message:'ordinary failure'}]) await diagnosticCase(s=>{s.emit('data',Buffer.from(JSON.stringify({ok:false,error})));s.emit('close',0)},/Bridge error: ordinary failure/);
+for (const error of ['Unsafe runtime artifact: reason=permissions', {message:'Unsafe runtime artifact: reason=permissions'}]) {
+ for (const status of [[1], [null,'TERM'], []]) await diagnosticCase(s=>{
+  s.emit('data',Buffer.from(JSON.stringify({ok:false,error})));
+  s.stderr.emit('data',Buffer.from('warning'));
+  s.emit('close',...status);
+ }, /bootstrap:.*(code 1|signal TERM|without verified exit status).*Bridge error: Unsafe runtime artifact: reason=permissions.*stderr tail: warning/);
+}
+for (const output of ['{SECRET', JSON.stringify({error:'SECRET'}), JSON.stringify({ok:false,error:{message:42,secret:'SECRET'}}), JSON.stringify({ok:true,error:'SECRET'})]) {
+ await diagnosticCase(s=>{s.emit('data',Buffer.from(output));s.emit('close',1)}, e=>e.message.includes('code 1') && !e.message.includes('SECRET') && !e.message.includes('JSON'));
+}
+await diagnosticCase(s=>{s.emit('data',Buffer.from(JSON.stringify({ok:false,error:JSON.stringify(bundle)+'\u001b[31m'+ 'x'.repeat(10000)})));s.emit('close',1)},e=>e.message.length<8400 && !e.message.includes(bundle.sha256) && !e.message.includes('\u001b'));
 // Exercise split UTF-8 and ssh2's exit-event status with argument-free close.
 const unicodeRecord={...record,name:'你好'};
 const unicodeConnect=async()=>Object.assign(new EventEmitter(),{destroy(){this.emit('close')},exec(cmd,cb){
