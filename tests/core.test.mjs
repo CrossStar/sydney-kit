@@ -31,7 +31,7 @@ for(const name of ['bash','read','edit','write','grep','unknown_mcp'])for(const 
  const diff=Array.from({length:10},(_,i)=>`+ ${i+1} 中文`).join('\n');
  r.renderResult({content:[{type:'text',text:Array.from({length:100},(_,i)=>'中文输出 '+i).join('\n')}],details:name==='edit'?{diff}:{}},{expanded,isPartial:false},theme,ctx);
  for(const width of [0,1,20,80,120])for(const line of component.render(width))assert.ok(visibleWidth(line)<=width,`${name} overflow ${width}`);
- if(!expanded&&!['edit','grep'].includes(name))assert.equal(component.render(80).length,1);
+ if(!expanded&&!['edit','grep','bash','powershell'].includes(name))assert.equal(component.render(80).length,1);
  if(!expanded&&name==='grep')assert.ok(component.render(80).length>1);
  assert.ok(component.render(80)[0].startsWith(name==='edit'||name==='write'?'✎':'✓'));
  assert.ok(!component.render(80).some(l=>/[\u2502\u251c\u2570\u256d]/.test(l)));
@@ -72,7 +72,7 @@ try {
  const result=await factory(temp).execute('smoke',args,undefined,undefined,{cwd:temp,sessionManager:{getSessionId:()=> 'sydney-kit-test',getSessionFile:()=>undefined}});
  const r=resolver(name,()=>undefined),ctx={state:{},cwd:temp,expanded:false,isError:false};
  const c=r.renderCall(args,theme,ctx);r.renderResult(result,{expanded:false,isPartial:false},theme,ctx);
- assert.ok(c.render(80).every(l=>visibleWidth(l)<=80));if(name!=='edit'&&name!=='write')assert.equal(c.render(80).length,1);
+ assert.ok(c.render(80).every(l=>visibleWidth(l)<=80));if(name!=='edit'&&name!=='write'&&name!=='bash')assert.equal(c.render(80).length,1);
  if(name==='write')assert.ok(c.render(80).some(l=>l.includes('hello')));
  }
  await assert.rejects(()=>sdk.createReadToolDefinition(temp).execute('missing',{path:'missing.txt'},undefined,undefined,{cwd:temp}));

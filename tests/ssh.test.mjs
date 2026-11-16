@@ -92,5 +92,47 @@ try {
  const parsed=parseSshCommand('ssh test@example.invalid -p 2222');assert.equal(parsed.host,'example.invalid');assert.equal(parsed.port,2222);assert.equal(parsed.username,'test');
  await tools.find(t=>t.name==='write').execute('5',{path:file,content:'disconnected local'},undefined,undefined,ctx);assert.equal(fs.readFileSync(file,'utf8'),'disconnected local');assert.equal(remote,'again');
  const {quote,shellWords}=await jiti.import(projectRoot+'/vendor/pi-ssh-remote/src/shell.ts');assert.deepEqual(shellWords("ssh 'user name'"),['ssh','user name']);assert.ok(quote("a'b").includes("'"));
+ // Exercise the actual exec branch with a fake transport (no SSH/network).
+ const source=fs.readFileSync(projectRoot+'/vendor/pi-ssh-remote/index.ts','utf8');
+ const start=source.indexOf('      if (params.action === "exec") {');
+ const end=source.indexOf('      const command = params.command || lastCommand',start);
+ const branch=source.slice(start,end);
+ assert.ok(start>0&&end>start);
+ const AsyncFunction=Object.getPrototypeOf(async function(){}).constructor;
+ const probe=new AsyncFunction('params','state','fail',`const updates=[],commands=[]; const ctx={},signal=undefined; let remote=state;
+ const _update=v=>updates.push(v),untilAborted=p=>p,ensureConnected=async()=>state;
+ const standaloneCdTarget=c=>c.startsWith('cd ')?c.slice(3):undefined;
+ const changeRemoteCwd=async p=>p,parseDisplayLines=x=>x,configuredDisplayLines=()=>5;
+ const parseRemoteTimeout=x=>x,DEFAULT_REMOTE_TIMEOUT_SECONDS=30;
+ const configuredOutputLimits=()=>({execMaxLines:200,execMaxBytes:8192});
+ const withReconnect=async f=>f({}),quote=x=>JSON.stringify(x);
+ const execRemoteLimited=async(c,command)=>{commands.push(command);if(fail)throw Object.assign(new Error('bad'),{exitCode:7});return {text:'ok',content:'ok',truncation:{truncated:false}}};
+ const limitRemoteToolResult=x=>x;
+ try { const result=await (async()=>{${branch}})();return {result,updates,commands}; }
+ catch(error){return {error,updates,commands};}`);
+ const state={label:'raspi',cwd:'/original',command:'ssh raspi'};
+ const executed=await probe({action:'exec',remoteCommand:'uname -a',cwd:'/override'},state,false);
+ assert.equal(executed.result.details.cwd,'/override');
+ assert.equal(executed.result.details.sydneyShell.host,'raspi');
+ assert.equal(executed.updates[0].details.sydneyShell.cwd,'/override');
+ assert.equal(executed.result.details.exitCode,0);
+ assert.match(executed.commands[0],/override/);
+ state.label='moon';assert.equal(executed.result.details.sydneyShell.host,'raspi');
+ const bad=await probe({action:'exec',remoteCommand:'false'},state,true);
+ assert.equal(bad.error.exitCode,7);assert.equal(bad.updates.at(-1).details.sydneyShell.exitCode,7);
+ const cd=await probe({action:'exec',remoteCommand:'cd /new'},state,false);
+ assert.equal(cd.result.details.cwd,'/new');assert.equal(cd.commands.length,0);
+ const opsStart=source.indexOf('  const remoteBashOps =');
+ const opsEnd=source.indexOf('  const localRead',opsStart);
+ const makeOps=new Function('remote','relative','sep',`const localCwd='/local'; const commands=[]; const parseRemoteTimeout=x=>x,DEFAULT_REMOTE_TIMEOUT_SECONDS=30,withRemoteTimeout=x=>x,quote=JSON.stringify; const withReconnect=async f=>f({}); const openAbortableExec=async(c,cmd)=>{commands.push(cmd);return {}}; const runExecChannel=async()=>({code:0,timedOut:false}); ${source.slice(opsStart,opsEnd).replace(': BashOperations','').replaceAll('bound!.','bound.')} return {ops:remoteBashOps(),commands};`);
+ const bound={cwd:'/bound',command:'ssh raspi'};
+ const {relative}=await import('node:path');
+ const fixture=makeOps(bound,relative,'/');bound.cwd='/changed';
+ await fixture.ops.exec('pwd','/local/sub',{onData(){}});
+ assert.match(fixture.commands[0],/\/bound\/sub/);
+ await fixture.ops.exec('pwd','/absolute',{onData(){}});
+ assert.match(fixture.commands[1],/\/absolute/);
+ bound.command='ssh moon';
+ await assert.rejects(fixture.ops.exec('pwd','/local',{onData(){}}),/route changed/);
  console.log('PASS SSH registration, lifecycle, disconnect and isolated snapshot backends');
 } finally {fs.rmSync(temp,{recursive:true,force:true});}

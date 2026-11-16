@@ -875,7 +875,7 @@ async function execRemoteLimited(
   if (code !== 0) {
     const message = accumulator.errorMessage() || `Remote command exited with code ${code}`;
     accumulator.close();
-    throw new Error(message);
+    throw Object.assign(new Error(message), { exitCode: code });
   }
   return accumulator.finish();
 }
@@ -1537,17 +1537,26 @@ function initializeOwner(pi: ExtensionAPI, ownerRoute: ReturnType<typeof routeSt
     return limitRemoteToolResult(result, "read", startLine, Math.min(requestedLines, limits.readMaxLines));
   };
 
-  const remoteBashOps = (): BashOperations => ({
+  const remoteBashOps = (bound = remote): BashOperations => {
+    const boundCwd = bound!.cwd, boundCommand = bound!.command;
+    const localBase = localCwd;
+    return ({
     exec: async (command, cwd, { onData, signal, timeout }) => {
       const timeoutSeconds = parseRemoteTimeout(timeout ?? DEFAULT_REMOTE_TIMEOUT_SECONDS);
       const remoteCommand = withRemoteTimeout(command, timeoutSeconds);
-      const full = `cd -- ${quote(mapPath(cwd))} && ${remoteCommand}`;
-      const stream = await withReconnect((client) => openAbortableExec(client, full, signal), signal);
+      const prefix = localBase.endsWith(sep) ? localBase : localBase + sep;
+      const mapped = cwd === localBase ? boundCwd : cwd.startsWith(prefix) ? boundCwd.replace(/\/$/, '') + '/' + relative(localBase, cwd).split(sep).join('/') : cwd;
+      const full = `cd -- ${quote(mapped)} && ${remoteCommand}`;
+      const stream = await withReconnect((client) => {
+        if (!remote || remote.command !== boundCommand) throw new Error('SSH execution route changed');
+        return openAbortableExec(client, full, signal);
+      }, signal);
       const { code, timedOut } = await runExecChannel(stream, timeoutSeconds, onData, onData, signal);
       if (timedOut || code === 124 || code === 137) throw new Error(`timeout:${timeoutSeconds}`);
       return { exitCode: code };
     },
   });
+  };
 
   const localRead = createReadToolDefinition(localCwd);
   const localWrite = createWriteToolDefinition(localCwd);
@@ -1603,8 +1612,11 @@ function initializeOwner(pi: ExtensionAPI, ownerRoute: ReturnType<typeof routeSt
     promptGuidelines: ["When using bash for remote logs and broad searches, use bounded commands such as tail, sed, or rg with limits instead of cat or unbounded find output."],
     execute: async (id, params, signal, update) => {
       if (!remote || !routeRemoteTools) return localBash.execute(id, params, signal, update);
-      const result = await createBashToolDefinition(localCwd, { operations: remoteBashOps() }).execute(id, params, signal, update);
-      return limitRemoteToolResult(result, "exec");
+      const sydneyShell = Object.freeze({ host: remote.label, cwd: remote.cwd, command: params.command });
+      const annotate = (value: any) => ({ ...value, details: { ...value.details, sydneyShell } });
+      update?.(annotate({ content: [] }));
+      const result = await createBashToolDefinition(localCwd, { operations: remoteBashOps() }).execute(id, params, signal, update ? (value) => update(annotate(value)) : undefined);
+      return annotate(limitRemoteToolResult(result, "exec"));
     },
   });
 
@@ -1705,28 +1717,39 @@ function initializeOwner(pi: ExtensionAPI, ownerRoute: ReturnType<typeof routeSt
       if (params.action === "exec") {
         const state = await untilAborted(ensureConnected(ctx), signal);
         if (!params.remoteCommand) throw new Error("remoteCommand is required for exec");
+        const sydneyShell = Object.freeze({ host: state.label, cwd: params.cwd ?? state.cwd, command: params.remoteCommand });
+        _update?.({ content: [], details: { sydneyShell } });
         const cdTarget = params.cwd === undefined ? standaloneCdTarget(params.remoteCommand) : undefined;
         if (cdTarget !== undefined) {
           const resolved = await changeRemoteCwd(cdTarget, ctx);
-          return { content: [{ type: "text", text: resolved }], details: { connected: true, cwd: resolved } };
+          return { content: [{ type: "text", text: resolved }], details: { connected: true, cwd: resolved, sydneyShell, exitCode: 0 } };
         }
         const displayLines = parseDisplayLines(params.displayLines ?? configuredDisplayLines());
         const timeoutSeconds = parseRemoteTimeout(params.timeout ?? DEFAULT_REMOTE_TIMEOUT_SECONDS);
         const limits = configuredOutputLimits();
-        const formatted = await withReconnect((client) => execRemoteLimited(
+        const boundCommand = state.command;
+        const boundCwd = sydneyShell.cwd;
+        const formatted = await withReconnect((client) => {
+          if (!remote || remote.command !== boundCommand) throw new Error('SSH execution route changed');
+          return execRemoteLimited(
           client,
-          `cd -- ${quote(params.cwd ?? state.cwd)} && ${params.remoteCommand}`,
+          `cd -- ${quote(boundCwd)} && ${sydneyShell.command}`,
           timeoutSeconds,
           limits.execMaxLines,
           limits.execMaxBytes,
           signal,
-        ), signal);
+        ); }, signal).catch((error) => {
+          _update?.({ content: [], details: { sydneyShell: { ...sydneyShell, ...(typeof error?.exitCode === 'number' ? { exitCode: error.exitCode } : {}) } } });
+          throw error;
+        });
         return limitRemoteToolResult({
           content: [{ type: "text", text: formatted.text }],
           details: {
             action: "exec",
             connected: true,
-            cwd: state.cwd,
+            cwd: params.cwd ?? state.cwd,
+            sydneyShell,
+            exitCode: 0,
             displayLines,
             output: formatted.content,
             modelLimited: true,

@@ -8,16 +8,21 @@ import { present } from './presenters';
 import { ToolRenderCache } from './render-cache';
 import { ResultNames } from './result-names';
 import { toolStatus } from './status';
+import { renderShellCommand } from './shell-command';
 import { renderWrite } from './write-presenter';
 import { summary, textOutput } from './utils';
 
 export default function registerCompact(pi: ExtensionAPI) {
   const names = new ResultNames();
   for (const event of ['session_start', 'session_switch', 'session_tree', 'session_shutdown'] as const) pi.on(event, () => names.clear());
-  pi.registerToolRenderer((name, next) => name === 'remote' ? next() : ({
+  pi.registerToolRenderer((name, next) => {
+    const downstream = name === 'remote' ? next() : undefined;
+    return ({
     renderShell: 'self',
     renderCall(args, theme, context) {
       const state = context.state;
+      state.shellSelected = name === 'bash' || name === 'powershell' || (name === 'remote' && args.action === 'exec');
+      if (name === 'remote' && !state.shellSelected) return downstream!.renderCall!(args, theme, context);
       state.args = args;
       state.argsSignature = JSON.stringify(args);
       const cache: ToolRenderCache = state.renderCache ??= new ToolRenderCache();
@@ -28,6 +33,7 @@ export default function registerCompact(pi: ExtensionAPI) {
         render(width: number) {
           if (width <= 0) return [];
           const ctx: ToolRenderContext = state.context;
+          if (state.shellSelected) return renderShellCommand(theme, width, state.args, state.result, ctx, state.shellMetadata);
           // Theme is a live proxy in Pi; its resolved colors identify the actual palette.
           const palette = theme.colors ?? theme;
           const knownName = names.describe(name, state.args);
@@ -65,12 +71,15 @@ export default function registerCompact(pi: ExtensionAPI) {
       };
     },
     renderResult(result, options, _theme, context) {
+      if (name === 'remote' && !context.state.shellSelected) return downstream!.renderResult!(result, options, _theme, context);
+      if (result.details?.sydneyShell) context.state.shellMetadata = result.details.sydneyShell;
       if (!options.isPartial) names.remember(name, context.state.args ?? context.args ?? {}, result);
       context.state.result = result;
       // Snapshot at update time, not on scroll. Also catches in-place streaming mutations.
       context.state.resultSignature = JSON.stringify(result);
-      context.state.context = { ...context, expanded: options.expanded };
+      context.state.context = { ...context, expanded: options.expanded, isPartial: options.isPartial };
       return { render: () => [], invalidate() {} };
     },
-  }));
+    });
+  });
 }
