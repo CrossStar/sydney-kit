@@ -38,6 +38,19 @@ for(const name of ['bash','read','edit','write','grep','unknown_mcp'])for(const 
  if(expanded&&name!=='edit')assert.ok(component.render(80).some(l=>l.includes('中文输出 99')));
  ctx.isError=true;r.renderResult({content:[{type:'text',text:'error1\nerror2\nerror3\nerror4'}]}, {expanded:false,isPartial:false},theme,ctx);assert.equal(component.render(80).length,4);assert.ok(component.render(80)[0].startsWith('✗'));assert.ok(component.render(80)[1].startsWith('    '));
 }
+const {renderWrite}=await jiti.import(root+'/src/tools/write-presenter.ts');
+const writeText=(content,details,ctx={})=>renderWrite(theme,100,{path:'/tmp/a.ts',content},{details},{cwd:'/tmp',...ctx},'',undefined).join('\n');
+assert.match(writeText('',{sydneyNewFile:true}),/created · empty/);
+assert.equal(writeText('',{sydneyNewFile:true}).split('\n').length,1);
+assert.doesNotMatch(writeText('',{sydneyNewFile:true}),/[▸▾]/);
+assert.match(writeText('x',{sydneyWrite:{outcome:'unverified'}},{isError:true}),/^!.*unverified/);
+assert.match(writeText('x',{sydneyWrite:{outcome:'unverified'}},{isError:true}),/Read the file to confirm/);
+assert.doesNotMatch(writeText('x',{sydneyWrite:{eofOnly:true}}),/[▸▾]/);
+assert.doesNotMatch(writeText('x',{sydneyWrite:{unchanged:true}}),/[▸▾]/);
+assert.match(writeText('x',{sydneyWrite:{eofOnly:true}}),/Removed final newline/);
+assert.match(writeText('x',{}, {isPartial:true,executionStarted:true}),/writing/);
+assert.match(writeText(Array.from({length:20},(_,i)=>`line${i}`).join('\n'),{}, {isPartial:true}),/earlier lines/);
+assert.match(writeText(Array.from({length:20},(_,i)=>`line${i}`).join('\n'),{}, {expanded:true}),/line19/);
 const old=projectRoot+'/tests/fixtures/original-footer.ts';
 const fixture=fs.mkdtempSync(path.join(os.tmpdir(),'sydney-footer-'));
 const fixtureSource=fs.readFileSync(fs.existsSync(old)?old:old+'.bak','utf8');
@@ -59,7 +72,8 @@ try {
  const result=await factory(temp).execute('smoke',args,undefined,undefined,{cwd:temp,sessionManager:{getSessionId:()=> 'sydney-kit-test',getSessionFile:()=>undefined}});
  const r=resolver(name,()=>undefined),ctx={state:{},cwd:temp,expanded:false,isError:false};
  const c=r.renderCall(args,theme,ctx);r.renderResult(result,{expanded:false,isPartial:false},theme,ctx);
- assert.ok(c.render(80).every(l=>visibleWidth(l)<=80));if(name!=='edit')assert.equal(c.render(80).length,1);
+ assert.ok(c.render(80).every(l=>visibleWidth(l)<=80));if(name!=='edit'&&name!=='write')assert.equal(c.render(80).length,1);
+ if(name==='write')assert.ok(c.render(80).some(l=>l.includes('hello')));
  }
  await assert.rejects(()=>sdk.createReadToolDefinition(temp).execute('missing',{path:'missing.txt'},undefined,undefined,{cwd:temp}));
 }finally{fs.rmSync(temp,{recursive:true,force:true})}

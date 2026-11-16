@@ -1450,7 +1450,7 @@ function initializeOwner(pi: ExtensionAPI, ownerRoute: ReturnType<typeof routeSt
         sftp.writeFile(target.file, content, error => error ? reject(error) : resolve()))),
       mkdir: async () => { await execRemote(client, `mkdir -p -- ${quote(target.directory)}`); },
     };
-    return { client, target, read, write };
+    return { client, target, read, write, host: selected.label };
   };
 
   const childProvider = (request: ExecutionBackendRequest) => {
@@ -1571,6 +1571,9 @@ function initializeOwner(pi: ExtensionAPI, ownerRoute: ReturnType<typeof routeSt
     execute: async (id, params, signal, update, ctx) => {
       const selected = remote && routeRemoteTools && !targetsLocalServerMemory(params.path) ? await fileBackend(params.path) : null;
       return executeSnapshotWrite(localCwd, id, params, signal, update, ctx, selected ? {
+        host: selected.host,
+        displayPath: params.path,
+        path: selected.target.file,
         operations: selected.write,
         readBefore: (path, max) => withSftp(selected.client, async sftp => {
           const target = selected.target.file;

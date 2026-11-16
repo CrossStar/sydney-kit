@@ -8,6 +8,7 @@ import { present } from './presenters';
 import { ToolRenderCache } from './render-cache';
 import { ResultNames } from './result-names';
 import { toolStatus } from './status';
+import { renderWrite } from './write-presenter';
 import { summary, textOutput } from './utils';
 
 export default function registerCompact(pi: ExtensionAPI) {
@@ -30,7 +31,7 @@ export default function registerCompact(pi: ExtensionAPI) {
           // Theme is a live proxy in Pi; its resolved colors identify the actual palette.
           const palette = theme.colors ?? theme;
           const knownName = names.describe(name, state.args);
-          const layoutKey = [width, palette, cfg.showExpandedArgs, state.diffRevision, state.argsSignature, state.resultSignature, ctx.expanded, ctx.isPartial, ctx.isError, ctx.durationMs, ctx.cwd, knownName];
+          const layoutKey = [width, palette, cfg.showExpandedArgs, state.diffRevision, state.argsSignature, state.resultSignature, ctx.expanded, ctx.executionStarted, ctx.argsComplete, ctx.isPartial, ctx.isError, ctx.durationMs, ctx.cwd, knownName];
           return cache.get('layout', layoutKey, () => {
             const { args, result } = state;
             const output: string = cache.get('text', [state.resultSignature], () => textOutput(result));
@@ -53,6 +54,7 @@ export default function registerCompact(pi: ExtensionAPI) {
               ? { added: hostChanges.filter(l => l[0] === '+').length, removed: hostChanges.filter(l => l[0] === '-').length }
               : undefined);
 
+            if (name === 'write' && (!result || typeof args.content === 'string')) return renderWrite(theme, width, args, result, ctx, output, rich);
             const status = toolStatus({ name, args, result, output, presentation, changes, failed, expanded: ctx.expanded, isPartial: ctx.isPartial, durationMs: ctx.durationMs });
             const lines = [headerLine(theme, width, short, knownName ?? defaultDescription, status)];
             const body = { name, args, argsSignature: state.argsSignature, result, output, failed, presentation, rich, hostDiff, hostChanges, cache, palette };
