@@ -5,6 +5,8 @@ import SSHConfig, { glob as matchesSshHost } from "ssh-config";
 import { quote, shellWords } from "../shell.ts";
 
 export interface ParsedSsh {
+  /** Original SSH destination name, before HostName resolution. */
+  alias?: string;
   host: string;
   port: number;
   username: string;
@@ -101,7 +103,7 @@ function resolveSshHost(
     return [...(preceding ?? []), destination];
   }) : [];
   return {
-    host, port, username, command, label: `${username}@${host}:${port}`,
+    alias, host, port, username, command, label: `${username}@${host}:${port}`,
     ...(overrides.identityFile ? { identityFile: identityFiles[0] } : {}),
     identityFiles, ...(agent ? { agent } : {}), ...(jumps.length ? { jumps } : {}),
   };

@@ -89,7 +89,8 @@ try {
  await hooks.session_shutdown({reason:'exit'});await hooks.session_shutdown({reason:'exit'});
  assert.equal(parentRoute.resume.cwd,'/parent','child lifecycle must not clear parent resume route');
  const {parseSshCommand}=await jiti.import(projectRoot+'/vendor/pi-ssh-remote/src/ssh/config.ts');
- const parsed=parseSshCommand('ssh test@example.invalid -p 2222');assert.equal(parsed.host,'example.invalid');assert.equal(parsed.port,2222);assert.equal(parsed.username,'test');
+ const parsed=parseSshCommand('ssh test@example.invalid -p 2222');assert.equal(parsed.host,'example.invalid');assert.equal(parsed.port,2222);assert.equal(parsed.username,'test');assert.equal(parsed.alias,'example.invalid');
+ assert.equal(parseSshCommand('ssh demo-alias.invalid').alias,'demo-alias.invalid');
  await tools.find(t=>t.name==='write').execute('5',{path:file,content:'disconnected local'},undefined,undefined,ctx);assert.equal(fs.readFileSync(file,'utf8'),'disconnected local');assert.equal(remote,'again');
  const {quote,shellWords}=await jiti.import(projectRoot+'/vendor/pi-ssh-remote/src/shell.ts');assert.deepEqual(shellWords("ssh 'user name'"),['ssh','user name']);assert.ok(quote("a'b").includes("'"));
  // Exercise the actual exec branch with a fake transport (no SSH/network).
@@ -110,14 +111,16 @@ try {
  const limitRemoteToolResult=x=>x;
  try { const result=await (async()=>{${branch}})();return {result,updates,commands}; }
  catch(error){return {error,updates,commands};}`);
- const state={label:'raspi',cwd:'/original',command:'ssh raspi'};
+ const state={alias:'raspi',host:'192.0.2.10',label:'user@192.0.2.10:22',cwd:'/original',command:'ssh raspi'};
  const executed=await probe({action:'exec',remoteCommand:'uname -a',cwd:'/override'},state,false);
  assert.equal(executed.result.details.cwd,'/override');
  assert.equal(executed.result.details.sydneyShell.host,'raspi');
  assert.equal(executed.updates[0].details.sydneyShell.cwd,'/override');
  assert.equal(executed.result.details.exitCode,0);
  assert.match(executed.commands[0],/override/);
- state.label='moon';assert.equal(executed.result.details.sydneyShell.host,'raspi');
+ state.alias='moon';state.label='other@192.0.2.11:22';assert.equal(executed.result.details.sydneyShell.host,'raspi');
+ const direct=await probe({action:'exec',remoteCommand:'pwd'},{host:'192.0.2.10',label:'user@192.0.2.10:22',cwd:'/original',command:'ssh user@192.0.2.10'},false);
+ assert.equal(direct.result.details.sydneyShell.host,'192.0.2.10');
  const bad=await probe({action:'exec',remoteCommand:'false'},state,true);
  assert.equal(bad.error.exitCode,7);assert.equal(bad.updates.at(-1).details.sydneyShell.exitCode,7);
  const cd=await probe({action:'exec',remoteCommand:'cd /new'},state,false);

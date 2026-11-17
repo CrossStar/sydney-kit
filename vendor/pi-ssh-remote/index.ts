@@ -1612,7 +1612,7 @@ function initializeOwner(pi: ExtensionAPI, ownerRoute: ReturnType<typeof routeSt
     promptGuidelines: ["When using bash for remote logs and broad searches, use bounded commands such as tail, sed, or rg with limits instead of cat or unbounded find output."],
     execute: async (id, params, signal, update) => {
       if (!remote || !routeRemoteTools) return localBash.execute(id, params, signal, update);
-      const sydneyShell = Object.freeze({ host: remote.label, cwd: remote.cwd, command: params.command });
+      const sydneyShell = Object.freeze({ host: remote.alias ?? remote.host, cwd: remote.cwd, command: params.command });
       const annotate = (value: any) => ({ ...value, details: { ...value.details, sydneyShell } });
       update?.(annotate({ content: [] }));
       const result = await createBashToolDefinition(localCwd, { operations: remoteBashOps() }).execute(id, params, signal, update ? (value) => update(annotate(value)) : undefined);
@@ -1717,7 +1717,7 @@ function initializeOwner(pi: ExtensionAPI, ownerRoute: ReturnType<typeof routeSt
       if (params.action === "exec") {
         const state = await untilAborted(ensureConnected(ctx), signal);
         if (!params.remoteCommand) throw new Error("remoteCommand is required for exec");
-        const sydneyShell = Object.freeze({ host: state.label, cwd: params.cwd ?? state.cwd, command: params.remoteCommand });
+        const sydneyShell = Object.freeze({ host: state.alias ?? state.host, cwd: params.cwd ?? state.cwd, command: params.remoteCommand });
         _update?.({ content: [], details: { sydneyShell } });
         const cdTarget = params.cwd === undefined ? standaloneCdTarget(params.remoteCommand) : undefined;
         if (cdTarget !== undefined) {
