@@ -1,8 +1,10 @@
 # Persistent SSH background tasks
 
+Deploy sydney-kit and pi-background-tasks together: this adapter accepts only protocol-2 bundles. Version-1 tasks keep running but are invisible and receive no completion notifications through the new extension. `mirrorLogs` passes source-ID-only ranges of at most 524,288 bytes through the bridge and validates base64, size and cursors; ordinary `logs` remains capped at 49,152 bytes.
+
 Native background-task releases advertise a runtime bundle through `sydney-kit:bg-hook:v1` with `includePersistentRuntime: true`. Sydney pins the resolved SSH route and working directory when discovering a provider. Each request opens and closes its own authenticated route; commands are never replayed after transport failures. Reconnect interactively if authentication needs a password or key passphrase.
 
-The remote host must already have Node 22 or newer. Sydney does not install Node. Runtime assets are validated against their canonical SHA256 and installed under `~/.pi/background-tasks-runtime/<digest>` using private permissions and atomic directory publication. The supervisor's stable service root is `~/.pi/background-tasks-remote`. Runtime installation alone does not submit a task.
+The remote host must already have Node 22 or newer. Sydney does not install Node. Runtime assets are validated against their canonical SHA256 and installed under `~/.pi/background-tasks-runtime/<digest>` using private permissions and atomic directory publication. The supervisor's stable service root is `~/.pi/background-tasks-remote-v2`. Only protocol 2 bundles with the seven runtime modules (including `log-sources.mjs` and `slurm-watch.mjs`) are accepted. This is a separate service: old remote tasks keep running but are invisible to the new extension, and no old daemon, supervisor, or service files are modified. Runtime installation alone does not submit a task.
 
 The historical install.mjs entry point is now a read-only native source compatibility check. Releases without the native execution provider contract and readiness hook must be upgraded; source patching and manifest recording are no longer supported. Native releases without the persistence capability retain the connection-bound spawn compatibility behavior.
 

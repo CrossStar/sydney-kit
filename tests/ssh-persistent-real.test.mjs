@@ -12,8 +12,8 @@ const shim=path.join(root,'home.cjs');
 fs.writeFileSync(shim,`require('node:os').homedir=()=>${JSON.stringify(root)};require('node:module').syncBuiltinESMExports();`);
 const env={...process.env,NODE_OPTIONS:`--require ${shim}`,PI_BG_SERVICE_DIR:path.join(root,'service')};
 const source=process.env.SYDNEY_BG_ROOT || '/home/sydney/Workspace/projects/pi-background-tasks';
-const files=Object.fromEntries(['daemon.mjs','shared.mjs','supervisor.mjs','windows-tree.mjs','remote-bridge.mjs'].map(n=>[n,fs.readFileSync(path.join(source,'src/persistent',n),'utf8')]));
-const bundle={protocol:1,files,sha256:runtimeDigest(files)};
+const files=Object.fromEntries(['daemon.mjs','shared.mjs','supervisor.mjs','windows-tree.mjs','remote-bridge.mjs','log-sources.mjs','slurm-watch.mjs'].map(n=>[n,fs.readFileSync(path.join(source,'src/persistent',n),'utf8')]));
+const bundle={protocol:2,files,sha256:runtimeDigest(files)};
 let daemon;
 let loseStartReply = true;
 const connect=async()=>{

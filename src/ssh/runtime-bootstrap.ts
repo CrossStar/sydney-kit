@@ -30,8 +30,8 @@ export async function installRuntime() {
       if (input.length > 16777216) throw new Error('Bundle too large');
     }
     const bundle = JSON.parse(input);
-    const names = ['daemon.mjs', 'remote-bridge.mjs', 'shared.mjs', 'supervisor.mjs', 'windows-tree.mjs'];
-    if (JSON.stringify(Object.keys(bundle.files).sort()) !== JSON.stringify(names) || digest(bundle.files) !== bundle.sha256) throw new Error('Runtime digest mismatch');
+    const names = ['daemon.mjs', 'log-sources.mjs', 'remote-bridge.mjs', 'shared.mjs', 'slurm-watch.mjs', 'supervisor.mjs', 'windows-tree.mjs'];
+    if (bundle.protocol !== 2 || JSON.stringify(Object.keys(bundle.files).sort()) !== JSON.stringify(names) || digest(bundle.files) !== bundle.sha256) throw new Error('Runtime digest mismatch');
     const base = path.join(os.homedir(), '.pi');
     directory(base, true);
     const root = path.join(base, 'background-tasks-runtime');

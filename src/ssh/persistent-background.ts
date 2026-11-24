@@ -2,13 +2,13 @@ import { installRuntime } from './runtime-bootstrap';
 import { StringDecoder } from 'node:string_decoder';
 import { createHash } from 'node:crypto';
 
-export interface RuntimeBundle { protocol: 1; sha256: string; files: Record<string, string> }
-const names = ['daemon.mjs', 'remote-bridge.mjs', 'shared.mjs', 'supervisor.mjs', 'windows-tree.mjs'];
+export interface RuntimeBundle { protocol: 2; sha256: string; files: Record<string, string> }
+const names = ['daemon.mjs', 'log-sources.mjs', 'remote-bridge.mjs', 'shared.mjs', 'slurm-watch.mjs', 'supervisor.mjs', 'windows-tree.mjs'];
 export function runtimeDigest(files: Record<string, string>): string {
   return createHash('sha256').update(JSON.stringify(Object.fromEntries(Object.entries(files).sort(([a], [b]) => a.localeCompare(b))))).digest('hex');
 }
 export function validateRuntime(bundle: RuntimeBundle): RuntimeBundle {
-  if (!bundle || bundle.protocol !== 1 || JSON.stringify(Object.keys(bundle.files).sort()) !== JSON.stringify(names) || Object.values(bundle.files).some(v => typeof v !== 'string') || runtimeDigest(bundle.files) !== bundle.sha256) throw new Error('Invalid persistent background runtime bundle');
+  if (!bundle || bundle.protocol !== 2 || JSON.stringify(Object.keys(bundle.files).sort()) !== JSON.stringify(names) || Object.values(bundle.files).some(v => typeof v !== 'string') || runtimeDigest(bundle.files) !== bundle.sha256) throw new Error('Invalid persistent background runtime bundle');
   return structuredClone(bundle);
 }
 export function persistentRouteId(route: any): string {
@@ -114,7 +114,7 @@ export function persistentBackground(connect: () => Promise<any>, supplied: Runt
       if (typeof directory !== 'string' || !directory.startsWith('/') || directory.includes('\0') || directory.split('/').some((part: string) => part === '..' || part === '.') || !directory.endsWith('/.pi/background-tasks-runtime/' + bundle.sha256)) throw new Error('Invalid runtime installation path');
       const bridgeCommand = `node ${quote(directory + '/remote-bridge.mjs')}`;
       const ensured = await exec('ensure', bridgeCommand, { method: 'ensure', params: {} });
-      if (ensured?.protocol !== 'pi-background-tasks-remote' || ensured.version !== 1 || ensured.daemonProtocolVersion !== 1 || typeof ensured.serviceRoot !== 'string' || !ensured.serviceRoot.startsWith('/')) throw new Error('Invalid remote supervisor identity');
+      if (ensured?.protocol !== 'pi-background-tasks-remote' || ensured.version !== 2 || ensured.daemonProtocolVersion !== 2 || typeof ensured.serviceRoot !== 'string' || !ensured.serviceRoot.startsWith('/')) throw new Error('Invalid remote supervisor identity');
       if (params.ownerSession !== undefined && ensured.sessionOwnership !== 1) throw new Error('Remote daemon does not support session ownership');
       if (serviceRoot && serviceRoot !== ensured.serviceRoot) throw new Error('Remote service root changed');
       serviceRoot = ensured.serviceRoot;
@@ -151,8 +151,17 @@ export function persistentBackground(connect: () => Promise<any>, supplied: Runt
     if (r.signal != null && typeof r.signal !== 'string') throw new Error('Invalid signal');
     return r;
   };
+  const readLogs = (method: string, limit: number) => (id: string, offset: number, maxBytes: number, ownerSession?: string, source?: string) => {
+    if (!Number.isSafeInteger(offset) || offset < 0 || !Number.isSafeInteger(maxBytes) || maxBytes < 1 || maxBytes > limit) return Promise.reject(new Error('Invalid log range'));
+    return operation(method, {id, offset, maxBytes, ownerSession, source}).then(r => {
+      if (!r || typeof r.data !== 'string' || !Number.isSafeInteger(r.size) || r.size < 0 || typeof r.eof !== 'boolean' || !Number.isSafeInteger(r.nextOffset)) throw new Error('Invalid log frame');
+      const bytes = Buffer.from(r.data, 'base64');
+      if (offset > r.size || r.eof !== (r.nextOffset >= r.size) || bytes.toString('base64') !== r.data || bytes.length > maxBytes || r.nextOffset !== offset + bytes.length || r.nextOffset > r.size || (!r.eof && bytes.length === 0)) throw new Error('Invalid log cursor');
+      return r;
+    });
+  };
   return {
-    start: async (request: any) => record(await operation('start', request), request.id, request.cwd, request.ownerSession),
+    start: async (request: any) => record(await operation('start', request), request.slurm ? undefined : request.id, request.slurm ? undefined : request.cwd, request.ownerSession),
     get: async (id: string, ownerSession?: string) => record(await operation('get', { id, ownerSession }), id, undefined, ownerSession),
     list: async (cwd: string, ownerSession?: string) => {
       const result: any = []; result.diagnostics = [];
@@ -169,14 +178,7 @@ export function persistentBackground(connect: () => Promise<any>, supplied: Runt
       throw new Error('Task pagination limit exceeded');
     },
     cancel: async (id: string, ownerSession?: string) => record(await operation('cancel', { id, ownerSession }), id, undefined, ownerSession),
-    logs: (id: string, offset: number, maxBytes: number, ownerSession?: string) => {
-      if (!Number.isSafeInteger(offset) || offset < 0 || !Number.isSafeInteger(maxBytes) || maxBytes < 1 || maxBytes > 49152) return Promise.reject(new Error('Invalid log range'));
-      return operation('logs', { id, offset, maxBytes, ownerSession }).then(r => {
-        if (!r || typeof r.data !== 'string' || !Number.isSafeInteger(r.size) || r.size < 0 || typeof r.eof !== 'boolean' || !Number.isSafeInteger(r.nextOffset)) throw new Error('Invalid log frame');
-        const bytes = Buffer.from(r.data, 'base64');
-        if (offset > r.size || r.eof !== (r.nextOffset >= r.size) || bytes.toString('base64') !== r.data || bytes.length > maxBytes || r.nextOffset !== offset + bytes.length || r.nextOffset > r.size || (!r.eof && bytes.length === 0)) throw new Error('Invalid log cursor');
-        return r;
-      });
-    },
+    logs: readLogs('logs', 49152),
+    mirrorLogs: readLogs('mirrorLogs', 524288),
   };
 }

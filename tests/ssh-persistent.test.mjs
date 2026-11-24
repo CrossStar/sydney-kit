@@ -3,22 +3,25 @@ import { EventEmitter } from 'node:events';
 import { hostImport } from './helpers/paths.mjs';
 const {createJiti}=await hostImport('pi-coding-agent/dist/core/extensions/jiti-loader.js');
 const {persistentBackground,persistentRouteId,runtimeDigest,validateRuntime}=await createJiti(import.meta.url).import('../src/ssh/persistent-background.ts');
-const files=Object.fromEntries(['daemon.mjs','shared.mjs','supervisor.mjs','windows-tree.mjs','remote-bridge.mjs'].map(k=>[k,'test']));
-const bundle={protocol:1,files,sha256:runtimeDigest(files)};
+const files=Object.fromEntries(['daemon.mjs','shared.mjs','supervisor.mjs','windows-tree.mjs','remote-bridge.mjs','log-sources.mjs','slurm-watch.mjs'].map(k=>[k,'test']));
+const bundle={protocol:2,files,sha256:runtimeDigest(files)};
 assert.throws(()=>validateRuntime({...bundle,sha256:'bad'}));
 assert.equal(persistentRouteId({username:'a',host:'h',port:22,password:'one'}),persistentRouteId({username:'a',host:'h',port:22,password:'two'}));
 assert.notEqual(persistentRouteId({username:'a',host:'h',port:22}),persistentRouteId({username:'b',host:'h',port:22}));
 let capability = 1;
 let closed=0, connections=0; const requests=[];
 const record={id:'same',cwd:'/work',name:'x',command:'true',status:'running',startedAt:1,outputFile:'/home/u/.pi/background-tasks-remote/tasks/same/output.log'};
-const connect=async()=>{connections++;return Object.assign(new EventEmitter(), {destroy(){closed++;this.emit('close')},exec(command,callback){const s=new EventEmitter();s.stderr=new EventEmitter();s.close=()=>{};s.end=input=>{const req=JSON.parse(input);requests.push(req);const result=req.files?'/test/.pi/background-tasks-runtime/'+bundle.sha256:req.method==='ensure'?{protocol:'pi-background-tasks-remote',version:1,daemonProtocolVersion:1,sessionOwnership:capability,serviceRoot:'/home/u/.pi/background-tasks-remote'}:req.method==='logs'?{data:'aGk=',size:2,nextOffset:2,eof:true}:req.method==='list'?{records:[record],diagnostics:[],nextOffset:null}:record;queueMicrotask(()=>{s.emit('data',Buffer.from(JSON.stringify({ok:true,result})));s.emit('close',0)});};callback(null,s)}})};
+const connect=async()=>{connections++;return Object.assign(new EventEmitter(), {destroy(){closed++;this.emit('close')},exec(command,callback){const s=new EventEmitter();s.stderr=new EventEmitter();s.close=()=>{};s.end=input=>{const req=JSON.parse(input);requests.push(req);const result=req.files?'/test/.pi/background-tasks-runtime/'+bundle.sha256:req.method==='ensure'?{protocol:'pi-background-tasks-remote',version:2,daemonProtocolVersion:2,sessionOwnership:capability,serviceRoot:'/home/u/.pi/background-tasks-remote'}:req.method==='logs'||req.method==='mirrorLogs'?{data:'aGk=',size:2,nextOffset:2,eof:true}:req.method==='list'?{records:[record],diagnostics:[],nextOffset:null}:record;queueMicrotask(()=>{s.emit('data',Buffer.from(JSON.stringify({ok:true,result})));s.emit('close',0)});};callback(null,s)}})};
 const adapter=persistentBackground(connect,bundle);
+await assert.rejects(adapter.mirrorLogs('same',0,524289),/Invalid log range/);
+assert.equal((await adapter.mirrorLogs('same',0,524288,undefined,'source-id')).size,2);
+assert.ok(requests.some(request=>request.method==='mirrorLogs' && request.params.source==='source-id'));
 assert.equal((await adapter.get('same')).id,'same');
 assert.equal((await adapter.cancel('same')).id,'same');
 assert.equal((await adapter.list('/work')).length,1);
 assert.equal((await adapter.logs('same',0,10)).data,'aGk=');
 await assert.rejects(adapter.logs('same',-1,10));
-assert.equal(connections,4);assert.equal(closed,4);
+assert.equal(connections,5);assert.equal(closed,5);
 await assert.rejects(persistentBackground(async()=>{throw Error('reconnect required')},bundle).get('same'),/reconnect required/);
 record.ownerSession='A';
 await adapter.start({...record});
@@ -71,7 +74,7 @@ await diagnosticCase(s=>{s.emit('data',Buffer.from(JSON.stringify({ok:false,erro
 const unicodeRecord={...record,name:'你好'};
 const unicodeConnect=async()=>Object.assign(new EventEmitter(),{destroy(){this.emit('close')},exec(cmd,cb){
  const s=Object.assign(new EventEmitter(),{stderr:new EventEmitter(),close(){this.emit('close')},end(input){
- const req=JSON.parse(input);const result=req.files?'/test/.pi/background-tasks-runtime/'+bundle.sha256:req.method==='ensure'?{protocol:'pi-background-tasks-remote',version:1,daemonProtocolVersion:1,serviceRoot:'/home/u/.pi/background-tasks-remote'}:unicodeRecord;
+ const req=JSON.parse(input);const result=req.files?'/test/.pi/background-tasks-runtime/'+bundle.sha256:req.method==='ensure'?{protocol:'pi-background-tasks-remote',version:2,daemonProtocolVersion:2,serviceRoot:'/home/u/.pi/background-tasks-remote'}:unicodeRecord;
  queueMicrotask(()=>{s.stderr.emit('data',Buffer.from('warning'));for(const byte of Buffer.from(JSON.stringify({ok:true,result})))s.emit('data',Buffer.from([byte]));s.emit('exit',0);s.emit('close')});
  }});cb(null,s);
 }});
