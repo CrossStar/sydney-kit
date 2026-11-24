@@ -11,7 +11,7 @@ assert.notEqual(persistentRouteId({username:'a',host:'h',port:22}),persistentRou
 let capability = 1;
 let closed=0, connections=0; const requests=[];
 const record={id:'same',cwd:'/work',name:'x',command:'true',status:'running',startedAt:1,outputFile:'/home/u/.pi/background-tasks-remote/tasks/same/output.log'};
-const connect=async()=>{connections++;return Object.assign(new EventEmitter(), {destroy(){closed++;this.emit('close')},exec(command,callback){const s=new EventEmitter();s.stderr=new EventEmitter();s.close=()=>{};s.end=input=>{const req=JSON.parse(input);requests.push(req);const result=req.files?'/test/.pi/background-tasks-runtime/'+bundle.sha256:req.method==='ensure'?{protocol:'pi-background-tasks-remote',version:2,daemonProtocolVersion:2,sessionOwnership:capability,serviceRoot:'/home/u/.pi/background-tasks-remote'}:req.method==='logs'||req.method==='mirrorLogs'?{data:'aGk=',size:2,nextOffset:2,eof:true}:req.method==='list'?{records:[record],diagnostics:[],nextOffset:null}:record;queueMicrotask(()=>{s.emit('data',Buffer.from(JSON.stringify({ok:true,result})));s.emit('close',0)});};callback(null,s)}})};
+const connect=async()=>{connections++;return Object.assign(new EventEmitter(), {destroy(){closed++;this.emit('close')},exec(command,callback){const s=new EventEmitter();s.stderr=new EventEmitter();s.close=()=>{};s.end=input=>{const req=JSON.parse(input);requests.push(req);const result=req.files?'/test/.pi/background-tasks-runtime/'+bundle.sha256:req.method==='ensure'?{protocol:'pi-background-tasks-remote',version:2,daemonProtocolVersion:2,sessionOwnership:capability,serviceRoot:'/home/u/.pi/background-tasks-remote'}:req.method==='logs'||req.method==='mirrorLogs'?{data:'aGk=',size:2,nextOffset:2,eof:true}:req.method==='list'?{records:[record],diagnostics:[],nextOffset:null}:req.method==='get'&&req.params.id==='legacy'?null:record;queueMicrotask(()=>{s.emit('data',Buffer.from(JSON.stringify({ok:true,result})));s.emit('close',0)});};callback(null,s)}})};
 const adapter=persistentBackground(connect,bundle);
 await assert.rejects(adapter.mirrorLogs('same',0,524289),/Invalid log range/);
 assert.equal((await adapter.mirrorLogs('same',0,524288,undefined,'source-id')).size,2);
@@ -37,6 +37,7 @@ const before=requests.length;
 await assert.rejects(adapter.cancel('same','A'),/does not support session ownership/);
 assert.equal(requests.slice(before).some(r=>r.method==='cancel'),false);
 await adapter.get('same');
+assert.equal(await adapter.get('legacy'),null);
 console.log('PASS persistent adapter validation, identity, session ownership, capability gate, logs, list and cancel');
 
 async function diagnosticCase(emit, pattern) {

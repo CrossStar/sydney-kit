@@ -162,7 +162,10 @@ export function persistentBackground(connect: () => Promise<any>, supplied: Runt
   };
   return {
     start: async (request: any) => record(await operation('start', request), request.slurm ? undefined : request.id, request.slurm ? undefined : request.cwd, request.ownerSession),
-    get: async (id: string, ownerSession?: string) => record(await operation('get', { id, ownerSession }), id, undefined, ownerSession),
+    get: async (id: string, ownerSession?: string) => {
+      const result = await operation('get', { id, ownerSession });
+      return result === null ? null : record(result, id, undefined, ownerSession);
+    },
     list: async (cwd: string, ownerSession?: string) => {
       const result: any = []; result.diagnostics = [];
       let offset = 0;
