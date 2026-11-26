@@ -50,4 +50,39 @@ const dark=c.render(80);initTheme('light');const light=c.render(80);assert.notDe
 args.path='new.ts';c=r.renderCall(args,measured,ctx);update();assert.ok(c.render(80)[0].includes('new.ts'));
 ctx.isError=true;result.content[0].text='read failed';update();assert.ok(c.render(80)[0].includes('✗'));
 c.render(80);const before=calls;c.invalidate();c.render(80);assert.ok(calls>before);
+// Shell cache: compare every miss against the uncached renderer, including streaming mutations.
+const {compact:cfg}=await jiti.import(projectRoot+'/config.ts');
+for(const name of ['bash','powershell','remote']) {
+  const renderer=resolver(name,()=>remoteRenderer);
+  const args={command:'printf 中文',remoteCommand:'printf 中文',action:'exec',displayLines:5};
+  const ctx={state:{},cwd:'/tmp',expanded:false,isPartial:false,executionStarted:true,durationMs:100};
+  const result={content:[{type:'text',text:'中文 é 🙂 output\n'.repeat(2000)}],details:{exitCode:0}};
+  let component=renderer.renderCall(args,measured,ctx);
+  const update=()=>renderer.renderResult(result,{expanded:ctx.expanded,isPartial:ctx.isPartial},measured,ctx);
+  update();
+  const check=(width=80)=>{
+    const actual=component.render(width);
+    assert.deepEqual(actual,renderShellCommand(theme,width,args,result,ctx.state.context,ctx.state.shellMetadata));
+    const n=calls;actual[0]='CORRUPTED';component.render(width);assert.equal(calls,n,`${name}: repeated render must skip styling`);
+  };
+  check();
+  component=renderer.renderCall(args,measured,ctx);update();
+  const n=calls;component.render(80);assert.equal(calls,n,'recreated callbacks retain cache');
+  const miss=(change,width=80)=>{change();const before=calls;check(width);assert.ok(calls>before,`${name}: invalidation`);};
+  for(const [key,value] of Object.entries({expanded:true,isPartial:true,isError:true,durationMs:2500,cwd:'/changed',executionStarted:false})) miss(()=>{ctx[key]=value;update();});
+  miss(()=>{args.command=args.remoteCommand='uname -a';component=renderer.renderCall(args,measured,ctx);update();});
+  miss(()=>{result.content[0].text='new stream 中文';update();});
+  for(const [key,value] of Object.entries({exitCode:2,stderr:'failure stderr',displayLines:2,sydneyShell:{command:'hostname',host:'moon',cwd:'/remote',exitCode:3}})) miss(()=>{result.details[key]=value;update();});
+  miss(()=>{delete result.details.sydneyShell;update();});
+  for(const key of ['command','host','cwd','exitCode']) miss(()=>{ctx.state.shellMetadata[key]=key==='exitCode'?7:'changed';});
+  for(const [key,value] of Object.entries({nameWidth:12,indent:'    ',ellipsis:'~',errorLines:1,showExpandedArgs:!cfg.showExpandedArgs})) {
+    const old=cfg[key];if(Object.is(old,value))continue;miss(()=>{cfg[key]=value;});cfg[key]=old;check();
+  }
+  miss(()=>{},20);check(80);
+  miss(()=>initTheme('dark'));miss(()=>initTheme('light'));
+  const old=process.env.NO_COLOR;miss(()=>{process.env.NO_COLOR='1';});
+  if(old===undefined)delete process.env.NO_COLOR;else process.env.NO_COLOR=old;
+  check();miss(()=>component.invalidate());assert.deepEqual(component.render(0),[]);
+}
+console.log('PASS: shell cache hits, update invalidation, metadata fallback, configuration, theme, width and array isolation.');
 console.log('PASS: layout hit, recreated callbacks, copy isolation, in-place stream update, expand/collapse, width, live theme, args, errors and invalidation.');

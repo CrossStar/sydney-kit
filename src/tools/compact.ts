@@ -33,7 +33,17 @@ export default function registerCompact(pi: ExtensionAPI) {
         render(width: number) {
           if (width <= 0) return [];
           const ctx: ToolRenderContext = state.context;
-          if (state.shellSelected) return renderShellCommand(theme, width, state.args, state.result, ctx, state.shellMetadata);
+          if (state.shellSelected) {
+            // Args/results are snapshotted by the update callbacks, never by scrolling.
+            // Retained execution metadata can outlive a partial result that supplied it.
+            const m = state.result?.details?.sydneyShell ?? state.shellMetadata;
+            const shellKey = [width, theme.colors ?? theme, process.env.NO_COLOR,
+              cfg.nameWidth, cfg.indent, cfg.ellipsis, cfg.errorLines, cfg.showExpandedArgs,
+              state.argsSignature, state.resultSignature, m?.command, m?.cwd, m?.host, m?.exitCode,
+              ctx.expanded, ctx.executionStarted, ctx.isPartial, ctx.isError, ctx.durationMs, ctx.cwd];
+            return cache.get('layout', shellKey, () =>
+              renderShellCommand(theme, width, state.args, state.result, ctx, state.shellMetadata)).slice();
+          }
           // Theme is a live proxy in Pi; its resolved colors identify the actual palette.
           const palette = theme.colors ?? theme;
           const knownName = names.describe(name, state.args);
