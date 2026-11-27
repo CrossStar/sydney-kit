@@ -11,7 +11,7 @@ const jiti=createJiti(import.meta.url,{alias:{'typebox':hostPath('../typebox/bui
 const {default:entry}=await jiti.import(root+'/index.ts');
 const {features}=await jiti.import(root+'/config.ts');
 
-features.ssh=false;features.userMessage=false;features.appearance=false;features.diff=false;features.pasteImage=false;
+features.sessions=false;features.ssh=false;features.userMessage=false;features.appearance=false;features.diff=false;features.pasteImage=false;
 const {initTheme}=await hostImport('pi-coding-agent/dist/index.js');initTheme('dark');
 const theme={fg:(_,s)=>s};
 let resolver;
@@ -22,6 +22,17 @@ for(const footer of [false,true])for(const compact of [false,true]){
  await entry({events:createEventBus(),on(){events++},registerCommand(){commands++},registerToolRenderer(r){resolver=r;renders++}});
  assert.equal(commands,footer?1:0);assert.equal(renders,compact?1:0);assert.equal(events>baseEvents,footer||compact);
 }
+features.footer=false;features.compact=false;
+const {default:interfaceEntry}=await jiti.import(root+'/entries/interface.ts');
+for(const enabled of [false,true]) {
+ features.sessions=enabled;
+ const commands=[];
+ const api={events:createEventBus(),on(){},registerCommand(name){commands.push(name);}};
+ await interfaceEntry(api);
+ await interfaceEntry(api);
+ assert.deepEqual(commands,enabled?['sessions']:[], 'interface owns sessions and deduplicates registration');
+}
+features.sessions=false;
 features.footer=true;features.compact=true;
 for(const name of ['bash','read','edit','write','grep','unknown_mcp'])for(const expanded of [false,true]){
  const r=resolver(name,()=>undefined);

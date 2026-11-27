@@ -108,7 +108,7 @@ Git 和手动目录安装均通过 `package.json` 默认加载三个入口（不
 
 | 入口 | 所属功能 |
 | --- | --- |
-| `entries/interface.ts` | 默认主题、状态栏、用户消息、EditorPipeline 与图片粘贴 |
+| `entries/interface.ts` | 默认主题、状态栏、用户消息、EditorPipeline、图片粘贴与会话管理 |
 | `entries/tool-view.ts` | 工具渲染与本地 write 差异快照 |
 | `entries/ssh-workspace.ts` | SSH 连接、远端工具路由与远端写入快照 |
 
@@ -130,12 +130,22 @@ Git 和手动目录安装均通过 `package.json` 默认加载三个入口（不
 
 图片粘贴需要支持图片输入的模型。Windows 使用 PowerShell，macOS 使用 Pi 自带的原生剪贴板组件；在 macOS 上需要把终端的 Option 键设为 Meta，`Alt+V` 才能生效，也可以把 `pasteImage.shortcut` 改为 `ctrl+v`。Linux 在 Wayland 下需要 `wl-clipboard`，在 X11 下需要 `xclip`；WSL 读取不到图片时，会改从 Windows 剪贴板读取。通过 SSH 运行时，在本地运行 `npm run clipboard-bridge`，并在 SSH 配置中加一行 `RemoteForward`，远端 Pi 就能粘贴本地剪贴板中的图片，配置步骤见 [SSH 图片粘贴](docs/PASTE-IMAGE.md#ssh)。默认将图片长边限制为 2000 像素。未发送图片的关联保存在内存中，执行 `/reload` 或切换会话后，需要重新粘贴草稿中的图片。
 
+## 会话管理
+
+`entries/interface.ts` 默认启用 `features.sessions`。终端交互模式下，未命名会话在首次 `agent_settled` 后尝试自动命名，每个会话在本次加载期间只尝试一次；已命名会话和由 `subagents:record` 中 `sessionFile` 明确记录的子会话跳过，普通 fork 保留。
+
+- `/sessions`：先输入搜索词，再选择会话；搜索名称、项目路径和消息内容。可切换当前项目／全部项目、隐藏／显示子会话，默认当前项目且隐藏子会话。
+- `/sessions rename`：选择会话后，由当前模型生成标题，编辑预览并确认才写入；取消不写入，期间会话变化则拒绝应用。历史会话通过追加 `session_info` 保存名称。
+
+标题生成使用当前模型的 `modelRegistry.complete`，缺少该能力或模型时跳过。`session.autoName` 默认 `true`；`session.transcriptChars` 默认 `12000`，限制发送的用户／助手文字；`session.timeoutMs` 默认 `15000`。关闭自动命名仍可使用上述命令，关闭 `features.sessions` 则停用整个功能。
+
 ## 配置
 
 所有功能开关集中在 `config.ts`：
 
 ```ts
 export const features = {
+  sessions: true,       // 会话搜索、自动命名和重命名
   ssh: true,            // SSH 连接和远程工具路由
   footer: true,          // 状态栏
   compact: true,         // 紧凑工具输出
@@ -176,6 +186,7 @@ export const features = {
 
 | 目录 | 职责 | 扩展方式 |
 | --- | --- | --- |
+| `src/sessions` | 会话搜索、标题生成、只读快照与子会话识别 | 通过 interface 入口注册 |
 | `src/ui` | 状态栏、用户消息、运行状态；`editor.ts` 统一组装输入框 | 输入框功能以“底座”或“装饰器”加入 `EditorPipeline`，不直接调用 `setEditorComponent` |
 | `src/tools` | 紧凑工具输出：`catalog.ts` 记录工具名，`presenters/` 按工具类别生成摘要，`status` / `layout` / `body` 负责表头与正文 | 新工具类别新增一个 presenter，并登记到 `presenters/index.ts` |
 | `src/rendering` | Shiki 高亮、`diff/`（行模型与上下 / 双栏视图） | 视图只消费 `diff/model.ts` 的行模型 |

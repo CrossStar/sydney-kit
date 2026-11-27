@@ -7,11 +7,13 @@ import userMessage from '../src/ui/user-message';
 import pasteImage from '../src/clipboard/paste-image';
 import { imageBackspace } from '../src/clipboard/image-editor';
 import registerEditor, { EditorPipeline } from '../src/ui/editor';
+import sessions from '../src/sessions';
 import { claim } from './shared/registration';
 export default async function(pi: ExtensionAPI) {
   if (!claim(pi, 'interface')) return;
   const editor = new EditorPipeline();
   theme(pi);
+  if (features.sessions) sessions(pi);
   if (features.footer) footer(pi);
   if (features.userMessage) userMessage(pi);
   if (features.appearance) editor.setBase(appearance(pi));
