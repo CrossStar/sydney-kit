@@ -139,6 +139,25 @@ Git 和手动目录安装均通过 `package.json` 默认加载三个入口（不
 
 标题生成使用当前模型的 `modelRegistry.complete`，缺少该能力或模型时跳过。`session.autoName` 默认 `true`；`session.transcriptChars` 默认 `12000`，限制发送的用户／助手文字；`session.timeoutMs` 默认 `15000`。关闭自动命名仍可使用上述命令，关闭 `features.sessions` 则停用整个功能。
 
+## 历史子会话离线迁移
+
+现有 `/sessions` 的过滤只影响扩展命令，不改变原生 `pi -r`。原生会话列表扫描项目目录直属 JSONL。新子会话目录需要支持 `getAgentDir()/subagent-sessions` 的新版 pi-subagents；本工具不修改或升级该扩展。
+
+先退出所有可能写入相关会话的 Pi（包括后台子代理），然后运行：
+
+```sh
+node scripts/migrate-subagent-sessions.mjs --sessions-root ~/.pi/agent/sessions --destination ~/.pi/agent/subagent-sessions
+# 核对 dry-run 中所有 source/target 后执行
+node scripts/migrate-subagent-sessions.mjs --apply
+# 使用输出的 manifest 路径恢复
+node scripts/migrate-subagent-sessions.mjs --rollback /absolute/path/to/manifest.json --apply
+node scripts/test.mjs migrate-subagent-sessions
+```
+
+默认路径如第一行；自定义路径时 apply 也必须传相同参数。默认 dry-run 不创建目录、备份或 manifest。仅扫描源根下一层项目目录的直属 JSONL，并继续读取 record 明确引用的 child；仅 `customType: subagents:record` 的 `data.sessionFile` 能认定子会话，不按名称或 `parentSession` 猜测。普通 fork 留在原处。全部扫描文件的所有分支 record 引用和 session header 的 `parentSession` 都会结构化更新，session/entry ID 不变。相对 record 路径按 header.cwd 解析，parentSession 按文件目录解析。源根外引用及缺失 child 保留原引用，不读取或迁移，并在 JSON 输出的 `skipped` 列表中逐条报告 `outside-source-root` 或 `missing-child` 原因；它们不会进入迁移映射。符号链接、损坏 JSONL 和目的碰撞均拒绝；未被扫描的外部引用不处理。
+
+迁移保留源相对路径，在目的根下 `.migration-*` 保存原始字节备份和包含 old/new SHA-256 的 manifest。写入前重新扫描核对全部内容及扫描集合；文件通过同目录临时文件 rename 替换，失败尽力回滚。回滚先验证所有备份和当前内容哈希，遇到后来改变的内容拒绝覆盖；备份保留供人工恢复。空目录可能保留。此工具没有写入进程锁，不保证并发安全，也不保证断电/强制终止时整批原子性；必须离线使用。manifest 是本机可信恢复文件，请勿使用来源不明的 manifest。
+
 ## 配置
 
 所有功能开关集中在 `config.ts`：
